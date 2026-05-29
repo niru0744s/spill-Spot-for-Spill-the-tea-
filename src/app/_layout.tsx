@@ -12,7 +12,7 @@
 import { Stack, useRouter, useSegments } from "expo-router";
 import { useAuth } from "@/hooks/useAuth";
 import { useEffect } from "react";
-import { View, ActivityIndicator } from "react-native";
+import { View, ActivityIndicator, StatusBar } from "react-native";
 
 export default function RootLayout() {
   const { useSessionListener, isInitialized, firebaseUser } = useAuth();
@@ -37,16 +37,20 @@ export default function RootLayout() {
 
   if (!isInitialized) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#0F2027', justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#38bdf8" />
+      <View style={{ flex: 1, backgroundColor: '#0f150e', justifyContent: 'center', alignItems: 'center' }}>
+        <StatusBar hidden />
+        <ActivityIndicator size="large" color="#96f996" />
       </View>
     );
   }
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(auth)" />
-      <Stack.Screen name="(tabs)" />
-    </Stack>
+    <>
+      <StatusBar hidden />
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(tabs)" />
+      </Stack>
+    </>
   );
 }
