@@ -28,7 +28,7 @@ export default function RootLayout() {
 
     if (!firebaseUser && !inAuthGroup) {
       // Redirect to login page if unauthenticated and not already in auth group
-      router.replace("/(auth)/index");
+      router.replace("/(auth)");
     } else if (firebaseUser && inAuthGroup) {
       // Redirect to main app if authenticated and trying to access auth screens
       router.replace("/(tabs)/chats");
