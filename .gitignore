@@ -84,3 +84,7 @@ yarn-error.*
 # ==========================================
 .DS_Store
 *.tsbuildinfo
+
+# stitch designs 
+
+stitchDesign
