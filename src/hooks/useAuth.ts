@@ -36,7 +36,6 @@ import {
   signOut as firebaseSignOut,
   onAuthStateChanged,
   updateProfile as updateFirebaseProfile,
-  sendEmailVerification,
   type User,
 } from "firebase/auth";
 import {
@@ -147,11 +146,6 @@ export function useAuth() {
 
         // 2. Persist displayName in Firebase Auth profile
         await updateFirebaseProfile(fbUser, { displayName });
-
-        // Send email verification using the Firebase console template
-        await sendEmailVerification(fbUser).catch((e) => {
-          console.warn("Failed to automatically send verification email:", e);
-        });
 
         // 3. Build and write Firestore user document
         const now = Timestamp.now();
@@ -388,27 +382,6 @@ export function useAuth() {
   );
 
   // -------------------------------------------------------------------------
-  // resendVerification
-  // -------------------------------------------------------------------------
-  const resendVerification = useCallback(async (): Promise<boolean> => {
-    if (!auth.currentUser) {
-      setError("No user is currently signed in.");
-      return false;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      await sendEmailVerification(auth.currentUser);
-      return true;
-    } catch (err) {
-      setError(parseAuthError(err));
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  }, [setLoading, setError]);
-
-  // -------------------------------------------------------------------------
   // useSessionListener
   // -------------------------------------------------------------------------
   /**
@@ -482,9 +455,6 @@ export function useAuth() {
     fetchUserProfile,
     updateProfile,
     updateProfilePhoto,
-
-    // ── Verification ───────────────────────────────────────────────────────
-    resendVerification,
 
     // ── Session ────────────────────────────────────────────────────────────
     useSessionListener,
