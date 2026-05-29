@@ -1,7 +1,7 @@
 import { queryRef, executeQuery, validateArgsWithOptions, mutationRef, executeMutation, validateArgs, makeMemoryCacheProvider } from 'firebase/data-connect';
 
 export const connectorConfig = {
-  connector: 'default_connector',
+  connector: 'default-connector',
   service: 'spill-811b2-2-service',
   location: 'us-east4'
 };

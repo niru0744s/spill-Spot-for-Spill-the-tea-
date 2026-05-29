@@ -1,7 +1,7 @@
 const { queryRef, executeQuery, validateArgsWithOptions, mutationRef, executeMutation, validateArgs, makeMemoryCacheProvider } = require('firebase/data-connect');
 
 const connectorConfig = {
-  connector: 'default_connector',
+  connector: 'default-connector',
   service: 'spill-811b2-2-service',
   location: 'us-east4'
 };

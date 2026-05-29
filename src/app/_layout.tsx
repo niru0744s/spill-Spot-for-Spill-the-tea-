@@ -9,19 +9,44 @@
  * auth and non-auth screens on cold start).
  */
 
-import { Stack } from "expo-router";
+import { Stack, useRouter, useSegments } from "expo-router";
 import { useAuth } from "@/hooks/useAuth";
+import { useEffect } from "react";
+import { View, ActivityIndicator } from "react-native";
 
 export default function RootLayout() {
-  const { useSessionListener, isInitialized } = useAuth();
+  const { useSessionListener, isInitialized, firebaseUser } = useAuth();
+  const segments = useSegments();
+  const router = useRouter();
 
-  // Wire up onAuthStateChanged once at the root — this restores persisted
-  // sessions and keeps isInitialized / user / firebaseUser in sync.
   useSessionListener();
 
-  // Optional: return null (or a SplashScreen component) until Firebase has
-  // resolved the session to prevent a flash of the wrong screen.
-  if (!isInitialized) return null;
+  useEffect(() => {
+    if (!isInitialized) return;
 
-  return <Stack />;
+    const inAuthGroup = segments[0] === "(auth)";
+
+    if (!firebaseUser && !inAuthGroup) {
+      // Redirect to login page if unauthenticated and not already in auth group
+      router.replace("/(auth)/login");
+    } else if (firebaseUser && inAuthGroup) {
+      // Redirect to main app if authenticated and trying to access auth screens
+      router.replace("/(tabs)/chats");
+    }
+  }, [firebaseUser, isInitialized, segments]);
+
+  if (!isInitialized) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#0F2027', justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#38bdf8" />
+      </View>
+    );
+  }
+
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="(auth)" />
+      <Stack.Screen name="(tabs)" />
+    </Stack>
+  );
 }

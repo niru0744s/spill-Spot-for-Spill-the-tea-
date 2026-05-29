@@ -3,7 +3,12 @@
 # ==========================================
 
 # Create a new user profile on sign-up.
-mutation CreateUser($username: String!, $email: String!, $passwordHash: String!, $now: Timestamp!) {
+mutation CreateUser(
+  $username: String!,
+  $email: String!,
+  $passwordHash: String!,
+  $now: Timestamp!
+) @auth(level: USER) {
   user_insert(data: {
     username: $username,
     email: $email,
@@ -24,7 +29,7 @@ mutation SendMessage(
   $content: String!,
   $messageType: String!,
   $now: Timestamp!
-) {
+) @auth(level: USER) {
   message_insert(data: {
     chatId: $chatId,
     senderId: $senderId,
@@ -41,7 +46,7 @@ mutation SendMessage(
 # ==========================================
 
 # Step 1 — create the chat row. Returns the new chat's UUID.
-mutation CreateChat($now: Timestamp!) {
+mutation CreateChat($now: Timestamp!) @auth(level: USER) {
   chat_insert(data: {
     isGroup: false,
     createdAt: $now
@@ -54,7 +59,7 @@ mutation AddChatParticipants(
   $userAId: UUID!,
   $userBId: UUID!,
   $now: Timestamp!
-) @transaction {
+) @transaction @auth(level: USER) {
   participantA: chatParticipant_insert(data: {
     chatId: $chatId,
     userId: $userAId,
@@ -74,7 +79,7 @@ mutation AddChatParticipants(
 # ==========================================
 
 # Update a user's last online timestamp.
-mutation UpdateLastSeen($userId: UUID!, $now: Timestamp!) {
+mutation UpdateLastSeen($userId: UUID!, $now: Timestamp!) @auth(level: USER) {
   user_update(
     id: $userId,
     data: { lastOnlineAt: $now }

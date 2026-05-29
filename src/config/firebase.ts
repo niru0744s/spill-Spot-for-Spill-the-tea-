@@ -40,6 +40,8 @@ const firebaseConfig = {
 // Guard: initialize the Firebase app only once
 // (critical for React Native HMR / fast-refresh)
 // ---------------------------------------------------------------------------
+console.log("DEBUG: firebaseConfig =", firebaseConfig);
+
 const app: FirebaseApp =
   getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 
@@ -56,7 +58,7 @@ try {
   auth = getAuth(app);
 }
 
-const db: Firestore = getFirestore(app);
+const db: Firestore = getFirestore(app, "default");
 const storage: FirebaseStorage = getStorage(app);
 const dataConnect: DataConnect = getDataConnect(app, connectorConfig);
 
