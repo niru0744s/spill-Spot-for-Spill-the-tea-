@@ -130,7 +130,8 @@ export function useAuth() {
     async (
       email: string,
       password: string,
-      displayName: string
+      displayName: string,
+      name: string
     ): Promise<UserProfile | null> => {
       setLoading(true);
       setError(null);
@@ -153,6 +154,7 @@ export function useAuth() {
           uid: fbUser.uid,
           email: fbUser.email ?? email,
           displayName,
+          name,
           photoURL: null,
           isOnline: true,
           lastSeen: now,

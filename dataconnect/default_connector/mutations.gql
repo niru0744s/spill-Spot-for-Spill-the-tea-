@@ -5,12 +5,14 @@
 # Create a new user profile on sign-up.
 mutation CreateUser(
   $username: String!,
+  $name: String!,
   $email: String!,
   $passwordHash: String!,
   $now: Timestamp!
 ) @auth(level: USER) {
   user_insert(data: {
     username: $username,
+    name: $name,
     email: $email,
     passwordHash: $passwordHash,
     createdAt: $now

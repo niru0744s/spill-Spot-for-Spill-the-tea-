@@ -8,6 +8,7 @@ export default function SignupScreen() {
   const router = useRouter();
   const { signUp, error: authError } = useAuth();
 
+  const [name, setName] = useState('');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -15,14 +16,14 @@ export default function SignupScreen() {
   const [validationError, setValidationError] = useState<string | null>(null);
 
   const handleSignup = async () => {
-    if (!username || !email || !password) {
+    if (!name || !username || !email || !password) {
       setValidationError('Please fill in all fields');
       return;
     }
 
     setLoading(true);
     setValidationError(null);
-    const success = await signUp(email, password, username);
+    const success = await signUp(email, password, username, name);
     setLoading(false);
 
     if (success) {
@@ -46,6 +47,19 @@ export default function SignupScreen() {
           )}
 
           <View style={styles.form}>
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Full Name</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Your real name"
+                placeholderTextColor="#8aa6b5"
+                value={name}
+                onChangeText={setName}
+                autoCapitalize="words"
+                autoCorrect={false}
+              />
+            </View>
+
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Username</Text>
               <TextInput

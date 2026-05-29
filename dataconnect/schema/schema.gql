@@ -1,5 +1,6 @@
 type User @table {
   username: String! @unique
+  name: String!
   email: String! @unique
   passwordHash: String!
   createdAt: Timestamp!
