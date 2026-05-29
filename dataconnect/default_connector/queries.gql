@@ -1,6 +1,10 @@
-# Fetch the inbox chat list for the logged-in user
-query GetMyChats {
-  chatParticipants(where: { user: { id: { eq: "_auth_user_id_" } } }) {
+# ==========================================
+# Chat Queries
+# ==========================================
+
+# Fetch the inbox — all chats the signed-in user is a participant of.
+query GetMyChats @auth(level: USER) {
+  chatParticipants(where: { user: { id: { eq_expr: "auth.uid" } } }) {
     chat {
       id
       isGroup
@@ -11,16 +15,63 @@ query GetMyChats {
   }
 }
 
-# Fetch the message history when opening a specific chat room
-query GetChatMessages($chatId: UUID!) {
-  messages(where: { chatId: { eq: $chatId } }, orderBy: [{ createdAt: DESC }]) {
+# Check if a 1:1 chat already exists between the current user and another user.
+# Returns the chat if found — call CreateOneToOneChat only if this returns empty.
+query FindExistingChat($otherUserId: UUID!) @auth(level: USER) {
+  chatParticipants(
+    where: {
+      _and: [
+        { user: { id: { eq_expr: "auth.uid" } } }
+        { chat: { isGroup: { eq: false } } }
+        {
+          chat: {
+            chatParticipants_on_chat: {
+              exist: { user: { id: { eq: $otherUserId } } }
+            }
+          }
+        }
+      ]
+    }
+    limit: 1
+  ) {
+    chat { id }
+  }
+}
+
+# ==========================================
+# Message Queries
+# ==========================================
+
+# Fetch the full message history for a specific chat, newest first.
+query GetChatMessages($chatId: UUID!) @auth(level: USER) {
+  messages(
+    where: { chatId: { eq: $chatId } }
+    orderBy: [{ createdAt: DESC }]
+  ) {
     id
     content
     messageType
+    status
     createdAt
     sender {
       id
       username
+      profilePictureUrl
     }
+  }
+}
+
+# ==========================================
+# User Queries
+# ==========================================
+
+# Fetch a user's public profile by their UUID.
+query GetUserProfile($userId: UUID!) @auth(level: USER) {
+  user(id: $userId) {
+    id
+    username
+    profilePictureUrl
+    bio
+    lastOnlineAt
   }
 }

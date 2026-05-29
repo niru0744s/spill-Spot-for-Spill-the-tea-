@@ -1,53 +1,82 @@
-# User create mutation 
+# ==========================================
+# User Mutations
+# ==========================================
 
-mutation CreateUser($username: String!, $email: String!) {
+# Create a new user profile on sign-up.
+mutation CreateUser($username: String!, $email: String!, $passwordHash: String!, $now: Timestamp!) {
   user_insert(data: {
     username: $username,
     email: $email,
-    bio: "Hey there! I am using Spill."
+    passwordHash: $passwordHash,
+    createdAt: $now
   })
 }
 
-# Custom Send Message mutation 
+# ==========================================
+# Message Mutations
+# ==========================================
 
-mutation SendMessage($chatId: UUID!, $content: String!, $messageType: String!) {
+# Send a message in a chat room.
+mutation SendMessage(
+  $chatId: UUID!,
+  $senderId: UUID!,
+  $receiverId: UUID!,
+  $content: String!,
+  $messageType: String!,
+  $now: Timestamp!
+) {
   message_insert(data: {
     chatId: $chatId,
+    senderId: $senderId,
+    receiverId: $receiverId,
     content: $content,
     messageType: $messageType,
-    status: "SENT"
+    status: "SENT",
+    createdAt: $now
   })
 }
 
-# Custom Backend Native SQL Mutation
-mutation GetOrCreateOneToOneChat($userA: String!, $userB: String!) {
-  _execute(script: """
-    WITH existing_chat AS (
-      SELECT cp1.chat_id 
-      FROM chat_participants cp1
-      JOIN chat_participants cp2 ON cp1.chat_id = cp2.chat_id
-      JOIN chats c ON cp1.chat_id = c.id
-      WHERE cp1.user_id = :userA 
-        AND cp2.user_id = :userB 
-        AND c.is_group = false
-      LIMIT 1
-    ),
-    new_chat AS (
-      INSERT INTO chats (is_group, created_at)
-      SELECT false, NOW()
-      WHERE NOT EXISTS (SELECT 1 FROM existing_chat)
-      RETURNING id
-    ),
-    inserted_participants AS (
-      INSERT INTO chat_participants (chat_id, user_id, unread_count, joined_at)
-      SELECT id, unrolled_users.user_id, 0, NOW()
-      FROM new_chat
-      CROSS JOIN (VALUES (:userA), (:userB)) AS unrolled_users(user_id)
-      WHERE EXISTS (SELECT 1 FROM new_chat)
-    )
-    SELECT COALESCE(
-      (SELECT chat_id FROM existing_chat),
-      (SELECT id FROM new_chat)
-    ) AS chat_id;
-  """)
+# ==========================================
+# Chat Mutations
+# ==========================================
+
+# Step 1 — create the chat row. Returns the new chat's UUID.
+mutation CreateChat($now: Timestamp!) {
+  chat_insert(data: {
+    isGroup: false,
+    createdAt: $now
+  })
+}
+
+# Step 2 — add both participants after the chat is created.
+mutation AddChatParticipants(
+  $chatId: UUID!,
+  $userAId: UUID!,
+  $userBId: UUID!,
+  $now: Timestamp!
+) @transaction {
+  participantA: chatParticipant_insert(data: {
+    chatId: $chatId,
+    userId: $userAId,
+    unreadCount: 0,
+    joinedAt: $now
+  })
+  participantB: chatParticipant_insert(data: {
+    chatId: $chatId,
+    userId: $userBId,
+    unreadCount: 0,
+    joinedAt: $now
+  })
+}
+
+# ==========================================
+# Presence Mutations
+# ==========================================
+
+# Update a user's last online timestamp.
+mutation UpdateLastSeen($userId: UUID!, $now: Timestamp!) {
+  user_update(
+    id: $userId,
+    data: { lastOnlineAt: $now }
+  )
 }
