@@ -31,6 +31,7 @@ import {
   StatusBar,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useAuth } from '@/hooks/useAuth';
 
 const { width, height } = Dimensions.get('window');
@@ -147,7 +148,7 @@ function GlassInput({
   autoCapitalize,
   delay,
 }: {
-  icon: string;
+  icon: React.ComponentProps<typeof MaterialIcons>['name'];
   placeholder: string;
   value: string;
   onChangeText: (t: string) => void;
@@ -175,7 +176,11 @@ function GlassInput({
           focused && styles.inputRowFocused,
         ]}
       >
-        <Text style={[styles.inputIcon, focused && styles.inputIconFocused]}>{icon}</Text>
+        <MaterialIcons
+          name={icon}
+          size={20}
+          color={focused ? C.primaryFixedDim : C.onSurfaceVariant}
+        />
         <TextInput
           style={styles.input}
           placeholder={placeholder}
@@ -322,7 +327,7 @@ export default function SignupScreen() {
             {/* Inputs */}
             <View style={styles.inputsGroup}>
               <GlassInput
-                icon="👤"
+                icon="person"
                 placeholder="Full Name"
                 value={name}
                 onChangeText={setName}
@@ -330,14 +335,14 @@ export default function SignupScreen() {
                 delay={800}
               />
               <GlassInput
-                icon="@"
+                icon="alternate-email"
                 placeholder="@username"
                 value={username}
                 onChangeText={setUsername}
                 delay={900}
               />
               <GlassInput
-                icon="✉"
+                icon="mail-outline"
                 placeholder="Email Address"
                 value={email}
                 onChangeText={setEmail}
@@ -345,7 +350,7 @@ export default function SignupScreen() {
                 delay={1000}
               />
               <GlassInput
-                icon="🔒"
+                icon="lock-outline"
                 placeholder="Password"
                 value={password}
                 onChangeText={setPassword}
@@ -562,15 +567,7 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 4,
   },
-  inputIcon: {
-    fontSize: 18,
-    color: C.onSurfaceVariant,
-    width: 22,
-    textAlign: 'center',
-  },
-  inputIconFocused: {
-    color: C.primaryFixedDim,
-  },
+  // Icon styling handled directly via MaterialIcons color prop
   input: {
     flex: 1,
     fontSize: 16,
