@@ -1,0 +1,49 @@
+type User @table {
+  username: String!
+  email: String!
+  passwordHash: String!
+  createdAt: Timestamp!
+  profilePictureUrl: String
+  bio: String
+  lastOnlineAt: Timestamp
+}
+
+type Chat @table {
+  isGroup: Boolean!
+  createdAt: Timestamp!
+  lastMessageText: String
+  lastMessageAt: Timestamp
+}
+
+type ChatParticipant @table(key: ["chat", "user"]) {
+  chat: Chat!
+  user: User!
+  joinedAt: Timestamp!
+  unreadCount: Int!
+}
+
+type Message @table {
+  chat: Chat!
+  sender: User!
+  receiver: User!
+  messageType: String!
+  content: String!
+  createdAt: Timestamp!
+  mediaUrl: String
+  status: String!
+}
+
+type Status @table {
+  user: User!
+  mediaType: String!
+  createdAt: Timestamp!
+  expiresAt: Timestamp!
+  content: String
+  mediaUrl: String
+}
+
+type Contact @table(key: ["owner", "contact"]) {
+  owner: User!
+  contact: User!
+  createdAt: Timestamp!
+}

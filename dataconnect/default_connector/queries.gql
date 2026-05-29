@@ -1,0 +1,26 @@
+# Fetch the inbox chat list for the logged-in user
+query GetMyChats {
+  chatParticipants(where: { user: { id: { eq: "_auth_user_id_" } } }) {
+    chat {
+      id
+      isGroup
+      lastMessageText
+      lastMessageAt
+    }
+    unreadCount
+  }
+}
+
+# Fetch the message history when opening a specific chat room
+query GetChatMessages($chatId: UUID!) {
+  messages(where: { chatId: { eq: $chatId } }, orderBy: [{ createdAt: DESC }]) {
+    id
+    content
+    messageType
+    createdAt
+    sender {
+      id
+      username
+    }
+  }
+}

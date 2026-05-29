@@ -1,0 +1,53 @@
+# User create mutation 
+
+mutation CreateUser($username: String!, $email: String!) {
+  user_insert(data: {
+    username: $username,
+    email: $email,
+    bio: "Hey there! I am using Spill."
+  })
+}
+
+# Custom Send Message mutation 
+
+mutation SendMessage($chatId: UUID!, $content: String!, $messageType: String!) {
+  message_insert(data: {
+    chatId: $chatId,
+    content: $content,
+    messageType: $messageType,
+    status: "SENT"
+  })
+}
+
+# Custom Backend Native SQL Mutation
+mutation GetOrCreateOneToOneChat($userA: String!, $userB: String!) {
+  _execute(script: """
+    WITH existing_chat AS (
+      SELECT cp1.chat_id 
+      FROM chat_participants cp1
+      JOIN chat_participants cp2 ON cp1.chat_id = cp2.chat_id
+      JOIN chats c ON cp1.chat_id = c.id
+      WHERE cp1.user_id = :userA 
+        AND cp2.user_id = :userB 
+        AND c.is_group = false
+      LIMIT 1
+    ),
+    new_chat AS (
+      INSERT INTO chats (is_group, created_at)
+      SELECT false, NOW()
+      WHERE NOT EXISTS (SELECT 1 FROM existing_chat)
+      RETURNING id
+    ),
+    inserted_participants AS (
+      INSERT INTO chat_participants (chat_id, user_id, unread_count, joined_at)
+      SELECT id, unrolled_users.user_id, 0, NOW()
+      FROM new_chat
+      CROSS JOIN (VALUES (:userA), (:userB)) AS unrolled_users(user_id)
+      WHERE EXISTS (SELECT 1 FROM new_chat)
+    )
+    SELECT COALESCE(
+      (SELECT chat_id FROM existing_chat),
+      (SELECT id FROM new_chat)
+    ) AS chat_id;
+  """)
+}

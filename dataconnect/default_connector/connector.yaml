@@ -1,0 +1,10 @@
+connectorId: "default_connector"
+generate:
+  javascriptSdk:
+    outputDir: "../../src/dataconnect-generated"
+    package: "@dataconnect/generated"
+    # 👇 THIS TURNS ON THE WHATSAPP-STYLE LOCAL STORAGE
+    clientCache:
+      maxAge: "30s"          # Keeps local data snappy before checking cloud
+      maxSize: "500MB"       # Keeps up to 500MB of chats on the phone
+      storage: "memory"      # Or configured local device storage
