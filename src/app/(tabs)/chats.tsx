@@ -227,8 +227,8 @@ export default function ChatsScreen() {
   }, [fetchMyChats]);
 
   const handleNewChat = useCallback(() => {
-    // TODO: navigate to new chat / contact picker
-  }, []);
+    router.push('/search');
+  }, [router]);
 
   return (
     <View style={styles.container}>

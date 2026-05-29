@@ -76,3 +76,18 @@ query GetUserProfile($userId: UUID!) @auth(level: USER) {
     lastOnlineAt
   }
 }
+
+# Search users by username substring (case-sensitive contains). Max 20 results.
+query SearchUsersByUsername($query: String!) @auth(level: USER) {
+  users(
+    where: { username: { contains: $query } }
+    limit: 20
+  ) {
+    id
+    username
+    name
+    profilePictureUrl
+    bio
+    lastOnlineAt
+  }
+}

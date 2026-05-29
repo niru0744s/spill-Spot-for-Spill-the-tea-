@@ -54,6 +54,7 @@ export interface CreateUserData {
 
 export interface CreateUserVariables {
   username: string;
+  name: string;
   email: string;
   passwordHash: string;
   now: TimestampString;
@@ -106,6 +107,7 @@ export interface GetUserProfileData {
   user?: {
     id: UUIDString;
     username: string;
+    name: string;
     profilePictureUrl?: string | null;
     bio?: string | null;
     lastOnlineAt?: TimestampString | null;
@@ -119,6 +121,21 @@ export interface GetUserProfileVariables {
 export interface Message_Key {
   id: UUIDString;
   __typename?: 'Message_Key';
+}
+
+export interface SearchUsersByUsernameData {
+  users: ({
+    id: UUIDString;
+    username: string;
+    name: string;
+    profilePictureUrl?: string | null;
+    bio?: string | null;
+    lastOnlineAt?: TimestampString | null;
+  } & User_Key)[];
+}
+
+export interface SearchUsersByUsernameVariables {
+  query: string;
 }
 
 export interface SendMessageData {
@@ -260,4 +277,16 @@ export const getUserProfileRef: GetUserProfileRef;
 
 export function getUserProfile(vars: GetUserProfileVariables, options?: ExecuteQueryOptions): QueryPromise<GetUserProfileData, GetUserProfileVariables>;
 export function getUserProfile(dc: DataConnect, vars: GetUserProfileVariables, options?: ExecuteQueryOptions): QueryPromise<GetUserProfileData, GetUserProfileVariables>;
+
+interface SearchUsersByUsernameRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: SearchUsersByUsernameVariables): QueryRef<SearchUsersByUsernameData, SearchUsersByUsernameVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: SearchUsersByUsernameVariables): QueryRef<SearchUsersByUsernameData, SearchUsersByUsernameVariables>;
+  operationName: string;
+}
+export const searchUsersByUsernameRef: SearchUsersByUsernameRef;
+
+export function searchUsersByUsername(vars: SearchUsersByUsernameVariables, options?: ExecuteQueryOptions): QueryPromise<SearchUsersByUsernameData, SearchUsersByUsernameVariables>;
+export function searchUsersByUsername(dc: DataConnect, vars: SearchUsersByUsernameVariables, options?: ExecuteQueryOptions): QueryPromise<SearchUsersByUsernameData, SearchUsersByUsernameVariables>;
 
