@@ -20,6 +20,7 @@ export interface StorageAdapter {
   getNumber(key: string): number | undefined;
   getBoolean(key: string): boolean | undefined;
   remove(key: string): void;
+  addOnValueChangedListener(callback: (key: string) => void): { remove(): void };
 }
 
 // ---------------------------------------------------------------------------
@@ -54,6 +55,9 @@ function createWebStorage(): StorageAdapter {
     remove(key) {
       if (canUseLS) localStorage.removeItem(key);
     },
+    addOnValueChangedListener(callback) {
+      return { remove: () => {} };
+    },
   };
 }
 
@@ -73,6 +77,7 @@ function createNativeStorage(): StorageAdapter {
       getNumber:  (k) => mmkv.getNumber(k),
       getBoolean: (k) => mmkv.getBoolean(k),
       remove:     (k) => mmkv.remove(k),
+      addOnValueChangedListener: (cb) => mmkv.addOnValueChangedListener(cb),
     };
   } catch (e) {
     console.warn('[storage] MMKV init failed, falling back to in-memory store:', e);
@@ -91,6 +96,9 @@ function createInMemoryStorage(): StorageAdapter {
     getNumber:  (k) => { const v = map.get(k); return typeof v === 'number' ? v : undefined; },
     getBoolean: (k) => { const v = map.get(k); return typeof v === 'boolean' ? v : undefined; },
     remove:     (k) => { map.delete(k); },
+    addOnValueChangedListener: (cb) => {
+      return { remove: () => {} };
+    },
   };
 }
 

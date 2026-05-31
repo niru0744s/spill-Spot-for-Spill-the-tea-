@@ -15,6 +15,7 @@
 import {
   collection,
   doc,
+  getDoc,
   setDoc,
   updateDoc,
   serverTimestamp,
@@ -38,6 +39,7 @@ import {
   type StoredMessage,
   type ChatMeta,
 } from './chatStorage';
+import { sendPushNotification } from './notificationService';
 
 // ---------------------------------------------------------------------------
 // Firestore path helper
@@ -140,11 +142,22 @@ async function uploadToFirestore(chatId: string, msg: StoredMessage, partnerUid?
     { merge: true }
   );
 
-  // ✉️ Write to partner's inbox so their global listener can pick it up
-  if (partnerUid) {
+  // Resolve partner UID from argument or local meta cache (critical for retry queue runs)
+  let actualPartnerUid = partnerUid;
+  if (!actualPartnerUid) {
+    const meta = getChatMeta(chatId);
+    if (meta) {
+      actualPartnerUid = meta.partnerUid;
+    }
+  }
+
+  // ✉️ Update inbox metadata documents in Firestore for both participants
+  if (actualPartnerUid) {
     const senderName  = auth.currentUser?.displayName ?? 'Someone';
     const senderPhoto = auth.currentUser?.photoURL ?? null;
-    const inboxRef = doc(db, 'users', partnerUid, 'inbox', chatId);
+    
+    // 1. Write to partner's inbox doc
+    const inboxRef = doc(db, 'users', actualPartnerUid, 'inbox', chatId);
     await setDoc(inboxRef, {
       chatId,
       partnerUid:    msg.senderUid,
@@ -154,6 +167,38 @@ async function uploadToFirestore(chatId: string, msg: StoredMessage, partnerUid?
       lastMessageAt: serverTimestamp(),
       unread:        increment(1),
     }, { merge: true });
+
+    // 2. Also write to own inbox doc so our own Firestore preview is kept up to date
+    const myInboxRef = doc(db, 'users', msg.senderUid, 'inbox', chatId);
+    const partnerMeta = getChatMeta(chatId);
+    await setDoc(myInboxRef, {
+      chatId,
+      partnerUid:    actualPartnerUid,
+      partnerName:   partnerMeta?.partnerName ?? 'Tea Friend',
+      partnerPhoto:  partnerMeta?.partnerPhoto ?? null,
+      lastMessage:   msg.content,
+      lastMessageAt: serverTimestamp(),
+      unread:        0, // We sent the message, so unread remains 0
+    }, { merge: true });
+
+    // Send Push Notification if receiver has registered a token
+    try {
+      const partnerSnap = await getDoc(doc(db, 'users', actualPartnerUid));
+      if (partnerSnap.exists()) {
+        const partnerData = partnerSnap.data();
+        const pushToken = partnerData?.pushToken;
+        if (pushToken) {
+          await sendPushNotification({
+            to: pushToken,
+            title: senderName,
+            body: msg.content,
+            data: { chatId, senderUid: msg.senderUid },
+          });
+        }
+      }
+    } catch (notifErr) {
+      console.warn('[messageService] Failed to deliver push notification:', notifErr);
+    }
   }
 
   // Update local status to SENT
