@@ -13,6 +13,7 @@ import { Stack, useRouter, useSegments } from "expo-router";
 import { useAuth } from "@/hooks/useAuth";
 import { useEffect } from "react";
 import { View, ActivityIndicator, StatusBar } from "react-native";
+import { useGlobalMessages } from "@/hooks/useGlobalMessages";
 
 export default function RootLayout() {
   const { useSessionListener, isInitialized, firebaseUser } = useAuth();
@@ -20,6 +21,9 @@ export default function RootLayout() {
   const router = useRouter();
 
   useSessionListener();
+
+  // 🌐 Global background message listener — runs for entire app session
+  useGlobalMessages();
 
   useEffect(() => {
     if (!isInitialized) return;
@@ -53,6 +57,10 @@ export default function RootLayout() {
         <Stack.Screen
           name="search"
           options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+        />
+        <Stack.Screen
+          name="chat/[id]"
+          options={{ animation: 'slide_from_right' }}
         />
       </Stack>
     </>

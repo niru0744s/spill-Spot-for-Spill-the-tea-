@@ -25,13 +25,14 @@ import {
   ScrollView,
   Dimensions,
   SafeAreaView,
-  ActivityIndicator,
+  Image,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useChat } from '@/hooks/useChat';
+import { useInbox, type InboxItem } from '@/hooks/useInbox';
 import { useAuth } from '@/hooks/useAuth';
+import { clearUnread } from '@/services/chatStorage';
 
 const { width } = Dimensions.get('window');
 
@@ -136,19 +137,21 @@ function MyTeaBubble({ displayName }: { displayName: string }) {
 }
 
 /* ── Chat card ─────────────────────────────────────────────── */
-function ChatCard({ item, onPress, index }: { item: any; onPress: () => void; index: number }) {
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+function ChatCard({ item, onPress, index }: { item: InboxItem; onPress: () => void; index: number }) {
+  const fadeAnim  = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 400, delay: index * 80, useNativeDriver: true }),
+      Animated.timing(fadeAnim,  { toValue: 1, duration: 400, delay: index * 80, useNativeDriver: true }),
       Animated.spring(slideAnim, { toValue: 0, tension: 60, friction: 8, delay: index * 80, useNativeDriver: true }),
     ]).start();
   }, []);
 
-  const hasUnread = item.unreadCount > 0;
-  const lastMsg = item.chat.lastMessageText;
+  const hasUnread  = item.unreadCount > 0;
+  const timeLabel  = item.lastMessageAt
+    ? formatTime(item.lastMessageAt)
+    : '';
 
   return (
     <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
@@ -157,36 +160,61 @@ function ChatCard({ item, onPress, index }: { item: any; onPress: () => void; in
         onPress={onPress}
         activeOpacity={0.75}
       >
-        {/* Subtle glow overlay for active cards */}
         {hasUnread && <View style={styles.chatCardGlow} />}
 
-        {/* Avatar circle */}
+        {/* Avatar */}
         <View style={[styles.chatAvatar, hasUnread && styles.chatAvatarActive]}>
-          <Text style={styles.chatAvatarText}>
-            {(item.chat.isGroup ? 'G' : '?')}
-          </Text>
+          {item.partnerPhoto ? (
+            <Image source={{ uri: item.partnerPhoto }} style={styles.chatAvatarImg} />
+          ) : (
+            <Text style={styles.chatAvatarText}>
+              {item.partnerName?.charAt(0)?.toUpperCase() ?? '?'}
+            </Text>
+          )}
+          {/* Online dot */}
+          {item.partnerOnline && <View style={styles.onlineDot} />}
         </View>
 
         {/* Info */}
         <View style={styles.chatInfo}>
           <View style={styles.chatRow}>
             <Text style={[styles.chatName, hasUnread && styles.chatNameActive]} numberOfLines={1}>
-              {item.chat.isGroup ? 'Group Chat' : 'Direct Message'}
+              {item.partnerName}
             </Text>
             <Text style={[styles.chatTime, hasUnread && styles.chatTimeActive]}>
-              {item.chat.lastMessageAt ? 'Just now' : ''}
+              {timeLabel}
             </Text>
           </View>
-          <Text style={styles.chatPreview} numberOfLines={1}>
-            {lastMsg ?? 'No messages yet'}
+          <Text style={[styles.chatPreview, hasUnread && styles.chatPreviewActive]} numberOfLines={1}>
+            {item.lastMessage || 'Say hello! 👋'}
           </Text>
         </View>
 
-        {/* Unread indicator dot */}
-        {hasUnread && <View style={styles.unreadDot} />}
+        {/* Unread badge */}
+        {hasUnread && (
+          <View style={styles.unreadBadge}>
+            <Text style={styles.unreadBadgeText}>
+              {item.unreadCount > 99 ? '99+' : String(item.unreadCount)}
+            </Text>
+          </View>
+        )}
       </TouchableOpacity>
     </Animated.View>
   );
+}
+
+/** Format a Unix ms timestamp into a human-readable label */
+function formatTime(ms: number): string {
+  const now  = Date.now();
+  const diff = now - ms;
+  const mins = Math.floor(diff / 60_000);
+  const hrs  = Math.floor(diff / 3_600_000);
+  const days = Math.floor(diff / 86_400_000);
+  if (mins < 1)  return 'Just now';
+  if (hrs  < 1)  return `${mins}m ago`;
+  if (days < 1)  return `${hrs}h ago`;
+  if (days < 7)  return `${days}d ago`;
+  return new Date(ms).toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
 /* ── Empty state ───────────────────────────────────────────── */
@@ -219,16 +247,34 @@ function EmptyState() {
 export default function ChatsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { chats, fetchMyChats, isLoading } = useChat();
+  const { chats, refresh } = useInbox();
   const { user } = useAuth();
 
-  useEffect(() => {
-    fetchMyChats();
-  }, [fetchMyChats]);
+  // Refresh inbox every time the tab comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      refresh();
+    }, [refresh])
+  );
 
   const handleNewChat = useCallback(() => {
     router.push('/search');
   }, [router]);
+
+  const handleOpenChat = useCallback((item: InboxItem) => {
+    // Clear unread count when opening
+    clearUnread(item.chatId);
+    refresh();
+    router.push({
+      pathname: '/chat/[id]',
+      params: {
+        id: item.partnerUid,
+        username: item.partnerName,
+        photoURL: item.partnerPhoto ?? 'null',
+        isOnline: String(item.partnerOnline),
+      },
+    });
+  }, [router, refresh]);
 
   return (
     <View style={styles.container}>
@@ -254,8 +300,8 @@ export default function ChatsScreen() {
 
         {/* ── Scrollable content ──────────────────────────── */}
         <FlatList
-          data={chats ?? []}
-          keyExtractor={(item) => item.chat.id}
+          data={chats}
+          keyExtractor={(item) => item.chatId}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
           ListHeaderComponent={() => (
@@ -273,10 +319,8 @@ export default function ChatsScreen() {
                 style={styles.storiesScroll}
               >
                 <MyTeaBubble displayName={user?.name ?? user?.displayName ?? 'Me'} />
-                {/* Future: contacts with statuses will be rendered here */}
               </ScrollView>
 
-              {/* Section gap */}
               <View style={{ height: 12 }} />
             </>
           )}
@@ -284,21 +328,10 @@ export default function ChatsScreen() {
             <ChatCard
               item={item}
               index={index}
-              onPress={() =>
-                router.push({ pathname: '/chat/[id]', params: { id: item.chat.id } })
-              }
+              onPress={() => handleOpenChat(item)}
             />
           )}
-          ListEmptyComponent={() =>
-            !isLoading ? <EmptyState /> : null
-          }
-          ListFooterComponent={() =>
-            isLoading ? (
-              <View style={styles.loadingRow}>
-                <ActivityIndicator size="small" color={C.primaryContainer} />
-              </View>
-            ) : null
-          }
+          ListEmptyComponent={<EmptyState />}
         />
 
         {/* ── Floating Action Button ───────────────────────── */}
@@ -565,6 +598,41 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '400',
     color: C.onSurfaceVariant,
+  },
+  chatAvatarImg: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+  },
+  onlineDot: {
+    position: 'absolute',
+    bottom: 1,
+    right: 1,
+    width: 13,
+    height: 13,
+    borderRadius: 7,
+    backgroundColor: '#96f996',
+    borderWidth: 2,
+    borderColor: '#0f150e',
+  },
+  chatPreviewActive: {
+    color: '#dfe4d9',
+    fontWeight: '500',
+  },
+  unreadBadge: {
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#96f996',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 5,
+    flexShrink: 0,
+  },
+  unreadBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#002105',
   },
   unreadDot: {
     width: 10,

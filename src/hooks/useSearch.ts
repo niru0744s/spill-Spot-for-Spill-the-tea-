@@ -1,17 +1,36 @@
 /**
  * hooks/useSearch.ts
  * -------------------
- * Hook for searching users by username substring.
- * Debounces the query by 400ms, uses the typed Data Connect SDK.
+ * Search users from Firestore /users collection by displayName (username).
+ *
+ * Strategy: Firestore doesn't support full-text search, but it DOES support
+ * prefix range queries. We do:
+ *   where displayName >= query AND displayName < query + '\uf8ff'
+ * This is a standard Firestore prefix-match pattern. It's case-sensitive, so
+ * we also lowercase both sides for a case-insensitive feel (requires a
+ * `displayNameLower` field, OR we just search as-is since usernames are
+ * usually typed exactly).
+ *
+ * We debounce 400ms before firing to avoid hammering Firestore on every key.
  */
 
 import { useState, useCallback, useRef } from 'react';
 import {
-  searchUsersByUsername,
-  type SearchUsersByUsernameData,
-} from '@/dataconnect-generated';
+  collection,
+  query,
+  where,
+  orderBy,
+  limit,
+  getDocs,
+  type DocumentData,
+} from 'firebase/firestore';
+import { db, auth } from '@/config/firebase';
+import { type UserProfile } from '@/store/authStore';
 
-export type SearchUser = SearchUsersByUsernameData['users'][0];
+export type SearchUser = Pick<
+  UserProfile,
+  'uid' | 'displayName' | 'name' | 'photoURL' | 'isOnline' | 'lastSeen'
+>;
 
 export function useSearch() {
   const [results, setResults] = useState<SearchUser[]>([]);
@@ -20,7 +39,6 @@ export function useSearch() {
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const search = useCallback((rawQuery: string) => {
-    // Clear pending timer
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
 
     const q = rawQuery.trim();
@@ -35,8 +53,36 @@ export function useSearch() {
 
     debounceTimer.current = setTimeout(async () => {
       try {
-        const result = await searchUsersByUsername({ query: q });
-        setResults(result.data.users ?? []);
+        // Firestore prefix-range query on displayName field
+        // e.g. query "ni" matches "niru01", "niko", "nishant" etc.
+        const end = q + '\uf8ff'; // \uf8ff is the highest Unicode code point, used as a sentinel
+
+        const usersRef = collection(db, 'users');
+        const q1 = query(
+          usersRef,
+          where('displayName', '>=', q),
+          where('displayName', '<=', end),
+          orderBy('displayName'),
+          limit(20)
+        );
+
+        const snapshot = await getDocs(q1);
+        const currentUid = auth.currentUser?.uid;
+        const users: SearchUser[] = snapshot.docs
+          .filter((doc) => doc.id !== currentUid) // exclude own profile
+          .map((doc) => {
+            const data = doc.data() as DocumentData;
+            return {
+              uid: doc.id,
+              displayName: data.displayName ?? '',
+              name: data.name ?? '',
+              photoURL: data.photoURL ?? null,
+              isOnline: data.isOnline ?? false,
+              lastSeen: data.lastSeen,
+            };
+          });
+
+        setResults(users);
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : 'Search failed. Please try again.';
         setError(msg);

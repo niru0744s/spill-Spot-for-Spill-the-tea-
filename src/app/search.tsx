@@ -39,9 +39,6 @@ import {
   Easing,
   Dimensions,
   ActivityIndicator,
-  ToastAndroid,
-  Platform,
-  Alert,
   Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -79,9 +76,9 @@ function AmbientOrbs() {
     const loop = (anim: Animated.ValueXY, dx: number, dy: number, dur: number) =>
       Animated.loop(
         Animated.sequence([
-          Animated.timing(anim, { toValue: { x: dx, y: dy }, duration: dur, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-          Animated.timing(anim, { toValue: { x: -dx * 0.5, y: dy * 1.2 }, duration: dur, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-          Animated.timing(anim, { toValue: { x: 0, y: 0 }, duration: dur, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+          Animated.timing(anim, { toValue: { x: dx, y: dy }, duration: dur, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
+          Animated.timing(anim, { toValue: { x: -dx * 0.5, y: dy * 1.2 }, duration: dur, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
+          Animated.timing(anim, { toValue: { x: 0, y: 0 }, duration: dur, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
         ])
       );
     loop(orb1, 30, -50, 20000).start();
@@ -142,14 +139,14 @@ function SearchBar({
 
   const handleFocus = () => {
     Animated.parallel([
-      Animated.spring(scaleAnim, { toValue: 1.03, useNativeDriver: true, tension: 60, friction: 8 }),
+      Animated.spring(scaleAnim, { toValue: 1.03, useNativeDriver: false, tension: 60, friction: 8 }),
       Animated.timing(glowAnim,  { toValue: 1, duration: 300, useNativeDriver: false }),
     ]).start();
   };
 
   const handleBlur = () => {
     Animated.parallel([
-      Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, tension: 60, friction: 8 }),
+      Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: false, tension: 60, friction: 8 }),
       Animated.timing(glowAnim,  { toValue: 0, duration: 300, useNativeDriver: false }),
     ]).start();
   };
@@ -184,8 +181,6 @@ function SearchBar({
 
 /* ── User result card ──────────────────────────────────────── */
 function UserCard({ user, index }: { user: SearchUser; index: number }) {
-  const router = useRouter();
-
   const slideAnim = useRef(new Animated.Value(24)).current;
   const fadeAnim  = useRef(new Animated.Value(0)).current;
 
@@ -207,30 +202,39 @@ function UserCard({ user, index }: { user: SearchUser; index: number }) {
     ]).start();
   }, []);
 
-  const isOnline = user.lastOnlineAt
-    ? Date.now() - new Date(user.lastOnlineAt).getTime() < 5 * 60 * 1000
-    : false;
+  // isOnline comes directly from Firestore field
+  const isOnline = user.isOnline;
 
   const lastSeenLabel = () => {
-    if (!user.lastOnlineAt) return null;
-    const diff = Date.now() - new Date(user.lastOnlineAt).getTime();
+    if (!user.lastSeen) return null;
+    // Firestore Timestamp — convert to ms
+    const ms = typeof user.lastSeen === 'object' && 'toMillis' in user.lastSeen
+      ? (user.lastSeen as { toMillis: () => number }).toMillis()
+      : Date.now();
+    const diff  = Date.now() - ms;
     const mins  = Math.floor(diff / 60000);
     const hours = Math.floor(diff / 3600000);
-    if (mins < 1)   return 'Just now';
+    if (mins  < 1)  return 'Just now';
     if (hours < 1)  return `${mins}m ago`;
     if (hours < 24) return `${hours}h ago`;
     return `${Math.floor(hours / 24)}d ago`;
   };
 
-  const handleStartChat = () => {
-    // Coming soon
-    const msg = 'Start Chat is coming soon! 🍵';
-    if (Platform.OS === 'android') {
-      ToastAndroid.show(msg, ToastAndroid.SHORT);
-    } else {
-      Alert.alert('Tea Alert', msg);
-    }
-  };
+  const router = useRouter();
+
+  const handleStartChat = useCallback(() => {
+    // Navigate directly to chat screen with the other user's UID.
+    // The chat page will handle finding/creating the actual chat session.
+    router.push({
+      pathname: '/chat/[id]',
+      params: {
+        id: user.uid,
+        username: user.displayName,
+        photoURL: user.photoURL ?? 'null',
+        isOnline: String(user.isOnline),
+      },
+    });
+  }, [user, router]);
 
   return (
     <Animated.View style={[styles.card, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
@@ -240,12 +244,12 @@ function UserCard({ user, index }: { user: SearchUser; index: number }) {
       {/* Header row: avatar + name/username + online status */}
       <View style={styles.cardHeader}>
         <View style={styles.avatarWrapper}>
-          {user.profilePictureUrl ? (
-            <Image source={{ uri: user.profilePictureUrl }} style={styles.avatar} />
+          {user.photoURL ? (
+            <Image source={{ uri: user.photoURL }} style={styles.avatar} />
           ) : (
             <View style={styles.avatarFallback}>
               <Text style={styles.avatarInitial}>
-                {user.username.charAt(0).toUpperCase()}
+                {user.displayName.charAt(0).toUpperCase()}
               </Text>
             </View>
           )}
@@ -255,7 +259,7 @@ function UserCard({ user, index }: { user: SearchUser; index: number }) {
 
         <View style={styles.cardNameBlock}>
           <Text style={styles.cardDisplayName} numberOfLines={1}>{user.name}</Text>
-          <Text style={styles.cardUsername} numberOfLines={1}>@{user.username}</Text>
+          <Text style={styles.cardUsername} numberOfLines={1}>@{user.displayName}</Text>
         </View>
 
         {/* Online / Last Seen badge */}
@@ -267,12 +271,8 @@ function UserCard({ user, index }: { user: SearchUser; index: number }) {
         </View>
       </View>
 
-      {/* Bio */}
-      {user.bio ? (
-        <Text style={styles.cardBio} numberOfLines={2}>{user.bio}</Text>
-      ) : (
-        <Text style={[styles.cardBio, { opacity: 0.4 }]} numberOfLines={1}>No bio yet.</Text>
-      )}
+      {/* No bio field in Firestore profile — skip */}
+      <Text style={[styles.cardBio, { opacity: 0.4 }]} numberOfLines={1}>Spilling tea since forever. 🍵</Text>
 
       {/* Start Chat CTA */}
       <TouchableOpacity
@@ -322,7 +322,7 @@ export default function SearchScreen() {
 
       {/* ── Top bar ─────────────────────────────────────────── */}
       <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} activeOpacity={0.7}>
+        <TouchableOpacity onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/chats')} style={styles.backBtn} activeOpacity={0.7}>
           <MaterialIcons name="arrow-back" size={22} color={C.onSurfaceVariant} />
         </TouchableOpacity>
         <Text style={styles.topBarLogo}>Tea</Text>
@@ -384,7 +384,7 @@ export default function SearchScreen() {
 
             {/* Result cards */}
             {!isSearching && results.map((user, i) => (
-              <UserCard key={user.id} user={user} index={i} />
+              <UserCard key={user.uid} user={user} index={i} />
             ))}
           </View>
         )}

@@ -78,6 +78,9 @@ query GetUserProfile($userId: UUID!) @auth(level: USER) {
 }
 
 # Search users by username substring (case-sensitive contains). Max 20 results.
+# NOTE: intentionally accessible to all authenticated users — username search
+# is a core social discovery feature. The warning about missing auth.uid filter
+# is expected and acceptable here.
 query SearchUsersByUsername($query: String!) @auth(level: USER) {
   users(
     where: { username: { contains: $query } }
