@@ -24,6 +24,7 @@ export interface UserProfile {
   uid: string;
   email: string;
   displayName: string;
+  name: string;
   photoURL: string | null;
   isOnline: boolean;
   lastSeen: Timestamp;

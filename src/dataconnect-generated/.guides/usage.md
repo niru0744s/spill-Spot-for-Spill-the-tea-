@@ -14,7 +14,7 @@ If a user is not using a supported framework, they can use the generated SDK dir
 Here's an example of how to use it with the first 5 operations:
 
 ```js
-import { createUser, sendMessage, createChat, addChatParticipants, updateLastSeen, getMyChats, findExistingChat, getChatMessages, getUserProfile } from '@dataconnect/generated';
+import { createUser, sendMessage, createChat, addChatParticipants, updateLastSeen, getMyChats, findExistingChat, getChatMessages, getUserProfile, searchUsersByUsername } from '@dataconnect/generated';
 
 
 // Operation CreateUser:  For variables, look at type CreateUserVars in ../index.d.ts
@@ -43,6 +43,9 @@ const { data } = await GetChatMessages(dataConnect, getChatMessagesVars);
 
 // Operation GetUserProfile:  For variables, look at type GetUserProfileVars in ../index.d.ts
 const { data } = await GetUserProfile(dataConnect, getUserProfileVars);
+
+// Operation SearchUsersByUsername:  For variables, look at type SearchUsersByUsernameVars in ../index.d.ts
+const { data } = await SearchUsersByUsername(dataConnect, searchUsersByUsernameVars);
 
 
 ```
