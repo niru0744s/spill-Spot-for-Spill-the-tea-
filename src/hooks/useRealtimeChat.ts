@@ -23,6 +23,7 @@ import {
   setDoc,
   deleteDoc,
   serverTimestamp,
+  Timestamp,
   type Unsubscribe,
 } from 'firebase/firestore';
 import NetInfo from '@react-native-community/netinfo';
@@ -33,7 +34,7 @@ import {
   markMessageDelivered,
   markMessagesAsRead,
 } from '@/services/messageService';
-import { getMessages, updateMessageStatus, type StoredMessage } from '@/services/chatStorage';
+import { getMessages, updateMessageStatus, getChatMeta, saveChatMeta, type StoredMessage } from '@/services/chatStorage';
 
 // ---------------------------------------------------------------------------
 // Hook
@@ -85,6 +86,20 @@ export function useRealtimeChat(chatId: string) {
             // Sync our optimistic status with what Firestore confirmed
             updateLocalStatus(msgId, data.status ?? 'SENT');
             updateMessageStatus(chatId, msgId, data.status ?? 'SENT');
+
+            // Sync the chat metadata preview in MMKV if this is the newest message
+            const meta = getChatMeta(chatId);
+            const msgCreatedAt = data.createdAt instanceof Timestamp
+              ? data.createdAt.toMillis()
+              : Date.now();
+            if (meta && msgCreatedAt >= (meta.lastMessageAt ?? 0)) {
+              saveChatMeta({
+                ...meta,
+                lastMessage: data.content ?? '',
+                lastMessageAt: msgCreatedAt,
+                isBackedUp: false,
+              });
+            }
             return;
           }
 
