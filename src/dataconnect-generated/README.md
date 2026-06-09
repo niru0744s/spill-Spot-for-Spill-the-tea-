@@ -9,6 +9,8 @@ This README will guide you through the process of using the generated JavaScript
   - [*Connecting to the local Emulator*](#connecting-to-the-local-emulator)
 - [**Queries**](#queries)
   - [*GetMyChats*](#getmychats)
+  - [*GetChatDetails*](#getchatdetails)
+  - [*GetDiscoverGroups*](#getdiscovergroups)
   - [*FindExistingChat*](#findexistingchat)
   - [*GetChatMessages*](#getchatmessages)
   - [*GetUserProfile*](#getuserprofile)
@@ -18,6 +20,11 @@ This README will guide you through the process of using the generated JavaScript
   - [*SendMessage*](#sendmessage)
   - [*CreateChat*](#createchat)
   - [*AddChatParticipants*](#addchatparticipants)
+  - [*CreateGroupChat*](#creategroupchat)
+  - [*AddGroupParticipant*](#addgroupparticipant)
+  - [*UpdateGroupParticipant*](#updategroupparticipant)
+  - [*RemoveGroupParticipant*](#removegroupparticipant)
+  - [*UpdateGroupMetadata*](#updategroupmetadata)
   - [*UpdateLastSeen*](#updatelastseen)
 
 # Accessing the connector
@@ -108,8 +115,13 @@ export interface GetMyChatsData {
       isGroup: boolean;
       lastMessageText?: string | null;
       lastMessageAt?: TimestampString | null;
+      groupName?: string | null;
+      groupImageUrl?: string | null;
+      groupDescription?: string | null;
     } & Chat_Key;
-      unreadCount: number;
+    unreadCount: number;
+    isAdmin?: boolean | null;
+    status?: string | null;
   })[];
 }
 ```
@@ -161,6 +173,238 @@ console.log(data.chatParticipants);
 executeQuery(ref).then((response) => {
   const data = response.data;
   console.log(data.chatParticipants);
+});
+```
+
+## GetChatDetails
+You can execute the `GetChatDetails` query using the following action shortcut function, or by calling `executeQuery()` after calling the following `QueryRef` function, both of which are defined in [dataconnect-generated/index.d.ts](./index.d.ts):
+```typescript
+getChatDetails(vars: GetChatDetailsVariables, options?: ExecuteQueryOptions): QueryPromise<GetChatDetailsData, GetChatDetailsVariables>;
+
+interface GetChatDetailsRef {
+  ...
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: GetChatDetailsVariables): QueryRef<GetChatDetailsData, GetChatDetailsVariables>;
+}
+export const getChatDetailsRef: GetChatDetailsRef;
+```
+You can also pass in a `DataConnect` instance to the action shortcut function or `QueryRef` function.
+```typescript
+getChatDetails(dc: DataConnect, vars: GetChatDetailsVariables, options?: ExecuteQueryOptions): QueryPromise<GetChatDetailsData, GetChatDetailsVariables>;
+
+interface GetChatDetailsRef {
+  ...
+  (dc: DataConnect, vars: GetChatDetailsVariables): QueryRef<GetChatDetailsData, GetChatDetailsVariables>;
+}
+export const getChatDetailsRef: GetChatDetailsRef;
+```
+
+If you need the name of the operation without creating a ref, you can retrieve the operation name by calling the `operationName` property on the getChatDetailsRef:
+```typescript
+const name = getChatDetailsRef.operationName;
+console.log(name);
+```
+
+### Variables
+The `GetChatDetails` query requires an argument of type `GetChatDetailsVariables`, which is defined in [dataconnect-generated/index.d.ts](./index.d.ts). It has the following fields:
+
+```typescript
+export interface GetChatDetailsVariables {
+  chatId: UUIDString;
+}
+```
+### Return Type
+Recall that executing the `GetChatDetails` query returns a `QueryPromise` that resolves to an object with a `data` property.
+
+The `data` property is an object of type `GetChatDetailsData`, which is defined in [dataconnect-generated/index.d.ts](./index.d.ts). It has the following fields:
+```typescript
+export interface GetChatDetailsData {
+  chat?: {
+    id: UUIDString;
+    isGroup: boolean;
+    groupName?: string | null;
+    groupImageUrl?: string | null;
+    groupDescription?: string | null;
+    createdAt: TimestampString;
+    chatParticipants_on_chat: ({
+      user: {
+        id: UUIDString;
+        username: string;
+        name: string;
+        profilePictureUrl?: string | null;
+        bio?: string | null;
+        lastOnlineAt?: TimestampString | null;
+      } & User_Key;
+      joinedAt: TimestampString;
+      unreadCount: number;
+      isAdmin?: boolean | null;
+      status?: string | null;
+    })[];
+  } & Chat_Key;
+}
+```
+### Using `GetChatDetails`'s action shortcut function
+
+```typescript
+import { getDataConnect } from 'firebase/data-connect';
+import { connectorConfig, getChatDetails, GetChatDetailsVariables } from '@dataconnect/generated';
+
+// The `GetChatDetails` query requires an argument of type `GetChatDetailsVariables`:
+const getChatDetailsVars: GetChatDetailsVariables = {
+  chatId: ..., 
+};
+
+// Call the `getChatDetails()` function to execute the query.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await getChatDetails(getChatDetailsVars);
+// Variables can be defined inline as well.
+const { data } = await getChatDetails({ chatId: ..., });
+
+// You can also pass in a `DataConnect` instance to the action shortcut function.
+const dataConnect = getDataConnect(connectorConfig);
+const { data } = await getChatDetails(dataConnect, getChatDetailsVars);
+
+console.log(data.chat);
+
+// Or, you can use the `Promise` API.
+getChatDetails(getChatDetailsVars).then((response) => {
+  const data = response.data;
+  console.log(data.chat);
+});
+```
+
+### Using `GetChatDetails`'s `QueryRef` function
+
+```typescript
+import { getDataConnect, executeQuery } from 'firebase/data-connect';
+import { connectorConfig, getChatDetailsRef, GetChatDetailsVariables } from '@dataconnect/generated';
+
+// The `GetChatDetails` query requires an argument of type `GetChatDetailsVariables`:
+const getChatDetailsVars: GetChatDetailsVariables = {
+  chatId: ..., 
+};
+
+// Call the `getChatDetailsRef()` function to get a reference to the query.
+const ref = getChatDetailsRef(getChatDetailsVars);
+// Variables can be defined inline as well.
+const ref = getChatDetailsRef({ chatId: ..., });
+
+// You can also pass in a `DataConnect` instance to the `QueryRef` function.
+const dataConnect = getDataConnect(connectorConfig);
+const ref = getChatDetailsRef(dataConnect, getChatDetailsVars);
+
+// Call `executeQuery()` on the reference to execute the query.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await executeQuery(ref);
+
+console.log(data.chat);
+
+// Or, you can use the `Promise` API.
+executeQuery(ref).then((response) => {
+  const data = response.data;
+  console.log(data.chat);
+});
+```
+
+## GetDiscoverGroups
+You can execute the `GetDiscoverGroups` query using the following action shortcut function, or by calling `executeQuery()` after calling the following `QueryRef` function, both of which are defined in [dataconnect-generated/index.d.ts](./index.d.ts):
+```typescript
+getDiscoverGroups(options?: ExecuteQueryOptions): QueryPromise<GetDiscoverGroupsData, undefined>;
+
+interface GetDiscoverGroupsRef {
+  ...
+  /* Allow users to create refs without passing in DataConnect */
+  (): QueryRef<GetDiscoverGroupsData, undefined>;
+}
+export const getDiscoverGroupsRef: GetDiscoverGroupsRef;
+```
+You can also pass in a `DataConnect` instance to the action shortcut function or `QueryRef` function.
+```typescript
+getDiscoverGroups(dc: DataConnect, options?: ExecuteQueryOptions): QueryPromise<GetDiscoverGroupsData, undefined>;
+
+interface GetDiscoverGroupsRef {
+  ...
+  (dc: DataConnect): QueryRef<GetDiscoverGroupsData, undefined>;
+}
+export const getDiscoverGroupsRef: GetDiscoverGroupsRef;
+```
+
+If you need the name of the operation without creating a ref, you can retrieve the operation name by calling the `operationName` property on the getDiscoverGroupsRef:
+```typescript
+const name = getDiscoverGroupsRef.operationName;
+console.log(name);
+```
+
+### Variables
+The `GetDiscoverGroups` query has no variables.
+### Return Type
+Recall that executing the `GetDiscoverGroups` query returns a `QueryPromise` that resolves to an object with a `data` property.
+
+The `data` property is an object of type `GetDiscoverGroupsData`, which is defined in [dataconnect-generated/index.d.ts](./index.d.ts). It has the following fields:
+```typescript
+export interface GetDiscoverGroupsData {
+  chats: ({
+    id: UUIDString;
+    groupName?: string | null;
+    groupImageUrl?: string | null;
+    groupDescription?: string | null;
+    createdAt: TimestampString;
+    chatParticipants_on_chat: ({
+      user: {
+        id: UUIDString;
+      } & User_Key;
+    })[];
+  } & Chat_Key)[];
+}
+```
+### Using `GetDiscoverGroups`'s action shortcut function
+
+```typescript
+import { getDataConnect } from 'firebase/data-connect';
+import { connectorConfig, getDiscoverGroups } from '@dataconnect/generated';
+
+
+// Call the `getDiscoverGroups()` function to execute the query.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await getDiscoverGroups();
+
+// You can also pass in a `DataConnect` instance to the action shortcut function.
+const dataConnect = getDataConnect(connectorConfig);
+const { data } = await getDiscoverGroups(dataConnect);
+
+console.log(data.chats);
+
+// Or, you can use the `Promise` API.
+getDiscoverGroups().then((response) => {
+  const data = response.data;
+  console.log(data.chats);
+});
+```
+
+### Using `GetDiscoverGroups`'s `QueryRef` function
+
+```typescript
+import { getDataConnect, executeQuery } from 'firebase/data-connect';
+import { connectorConfig, getDiscoverGroupsRef } from '@dataconnect/generated';
+
+
+// Call the `getDiscoverGroupsRef()` function to get a reference to the query.
+const ref = getDiscoverGroupsRef();
+
+// You can also pass in a `DataConnect` instance to the `QueryRef` function.
+const dataConnect = getDataConnect(connectorConfig);
+const ref = getDiscoverGroupsRef(dataConnect);
+
+// Call `executeQuery()` on the reference to execute the query.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await executeQuery(ref);
+
+console.log(data.chats);
+
+// Or, you can use the `Promise` API.
+executeQuery(ref).then((response) => {
+  const data = response.data;
+  console.log(data.chats);
 });
 ```
 
@@ -801,7 +1045,7 @@ The `SendMessage` mutation requires an argument of type `SendMessageVariables`, 
 export interface SendMessageVariables {
   chatId: UUIDString;
   senderId: UUIDString;
-  receiverId: UUIDString;
+  receiverId?: UUIDString | null;
   content: string;
   messageType: string;
   now: TimestampString;
@@ -826,7 +1070,7 @@ import { connectorConfig, sendMessage, SendMessageVariables } from '@dataconnect
 const sendMessageVars: SendMessageVariables = {
   chatId: ..., 
   senderId: ..., 
-  receiverId: ..., 
+  receiverId: ..., // optional
   content: ..., 
   messageType: ..., 
   now: ..., 
@@ -861,7 +1105,7 @@ import { connectorConfig, sendMessageRef, SendMessageVariables } from '@dataconn
 const sendMessageVars: SendMessageVariables = {
   chatId: ..., 
   senderId: ..., 
-  receiverId: ..., 
+  receiverId: ..., // optional
   content: ..., 
   messageType: ..., 
   now: ..., 
@@ -1118,6 +1362,590 @@ executeMutation(ref).then((response) => {
   const data = response.data;
   console.log(data.participantA);
   console.log(data.participantB);
+});
+```
+
+## CreateGroupChat
+You can execute the `CreateGroupChat` mutation using the following action shortcut function, or by calling `executeMutation()` after calling the following `MutationRef` function, both of which are defined in [dataconnect-generated/index.d.ts](./index.d.ts):
+```typescript
+createGroupChat(vars: CreateGroupChatVariables): MutationPromise<CreateGroupChatData, CreateGroupChatVariables>;
+
+interface CreateGroupChatRef {
+  ...
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: CreateGroupChatVariables): MutationRef<CreateGroupChatData, CreateGroupChatVariables>;
+}
+export const createGroupChatRef: CreateGroupChatRef;
+```
+You can also pass in a `DataConnect` instance to the action shortcut function or `MutationRef` function.
+```typescript
+createGroupChat(dc: DataConnect, vars: CreateGroupChatVariables): MutationPromise<CreateGroupChatData, CreateGroupChatVariables>;
+
+interface CreateGroupChatRef {
+  ...
+  (dc: DataConnect, vars: CreateGroupChatVariables): MutationRef<CreateGroupChatData, CreateGroupChatVariables>;
+}
+export const createGroupChatRef: CreateGroupChatRef;
+```
+
+If you need the name of the operation without creating a ref, you can retrieve the operation name by calling the `operationName` property on the createGroupChatRef:
+```typescript
+const name = createGroupChatRef.operationName;
+console.log(name);
+```
+
+### Variables
+The `CreateGroupChat` mutation requires an argument of type `CreateGroupChatVariables`, which is defined in [dataconnect-generated/index.d.ts](./index.d.ts). It has the following fields:
+
+```typescript
+export interface CreateGroupChatVariables {
+  groupName: string;
+  groupImageUrl?: string | null;
+  groupDescription?: string | null;
+  now: TimestampString;
+}
+```
+### Return Type
+Recall that executing the `CreateGroupChat` mutation returns a `MutationPromise` that resolves to an object with a `data` property.
+
+The `data` property is an object of type `CreateGroupChatData`, which is defined in [dataconnect-generated/index.d.ts](./index.d.ts). It has the following fields:
+```typescript
+export interface CreateGroupChatData {
+  chat_insert: Chat_Key;
+}
+```
+### Using `CreateGroupChat`'s action shortcut function
+
+```typescript
+import { getDataConnect } from 'firebase/data-connect';
+import { connectorConfig, createGroupChat, CreateGroupChatVariables } from '@dataconnect/generated';
+
+// The `CreateGroupChat` mutation requires an argument of type `CreateGroupChatVariables`:
+const createGroupChatVars: CreateGroupChatVariables = {
+  groupName: ..., 
+  groupImageUrl: ..., // optional
+  groupDescription: ..., // optional
+  now: ..., 
+};
+
+// Call the `createGroupChat()` function to execute the mutation.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await createGroupChat(createGroupChatVars);
+// Variables can be defined inline as well.
+const { data } = await createGroupChat({ groupName: ..., groupImageUrl: ..., groupDescription: ..., now: ..., });
+
+// You can also pass in a `DataConnect` instance to the action shortcut function.
+const dataConnect = getDataConnect(connectorConfig);
+const { data } = await createGroupChat(dataConnect, createGroupChatVars);
+
+console.log(data.chat_insert);
+
+// Or, you can use the `Promise` API.
+createGroupChat(createGroupChatVars).then((response) => {
+  const data = response.data;
+  console.log(data.chat_insert);
+});
+```
+
+### Using `CreateGroupChat`'s `MutationRef` function
+
+```typescript
+import { getDataConnect, executeMutation } from 'firebase/data-connect';
+import { connectorConfig, createGroupChatRef, CreateGroupChatVariables } from '@dataconnect/generated';
+
+// The `CreateGroupChat` mutation requires an argument of type `CreateGroupChatVariables`:
+const createGroupChatVars: CreateGroupChatVariables = {
+  groupName: ..., 
+  groupImageUrl: ..., // optional
+  groupDescription: ..., // optional
+  now: ..., 
+};
+
+// Call the `createGroupChatRef()` function to get a reference to the mutation.
+const ref = createGroupChatRef(createGroupChatVars);
+// Variables can be defined inline as well.
+const ref = createGroupChatRef({ groupName: ..., groupImageUrl: ..., groupDescription: ..., now: ..., });
+
+// You can also pass in a `DataConnect` instance to the `MutationRef` function.
+const dataConnect = getDataConnect(connectorConfig);
+const ref = createGroupChatRef(dataConnect, createGroupChatVars);
+
+// Call `executeMutation()` on the reference to execute the mutation.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await executeMutation(ref);
+
+console.log(data.chat_insert);
+
+// Or, you can use the `Promise` API.
+executeMutation(ref).then((response) => {
+  const data = response.data;
+  console.log(data.chat_insert);
+});
+```
+
+## AddGroupParticipant
+You can execute the `AddGroupParticipant` mutation using the following action shortcut function, or by calling `executeMutation()` after calling the following `MutationRef` function, both of which are defined in [dataconnect-generated/index.d.ts](./index.d.ts):
+```typescript
+addGroupParticipant(vars: AddGroupParticipantVariables): MutationPromise<AddGroupParticipantData, AddGroupParticipantVariables>;
+
+interface AddGroupParticipantRef {
+  ...
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: AddGroupParticipantVariables): MutationRef<AddGroupParticipantData, AddGroupParticipantVariables>;
+}
+export const addGroupParticipantRef: AddGroupParticipantRef;
+```
+You can also pass in a `DataConnect` instance to the action shortcut function or `MutationRef` function.
+```typescript
+addGroupParticipant(dc: DataConnect, vars: AddGroupParticipantVariables): MutationPromise<AddGroupParticipantData, AddGroupParticipantVariables>;
+
+interface AddGroupParticipantRef {
+  ...
+  (dc: DataConnect, vars: AddGroupParticipantVariables): MutationRef<AddGroupParticipantData, AddGroupParticipantVariables>;
+}
+export const addGroupParticipantRef: AddGroupParticipantRef;
+```
+
+If you need the name of the operation without creating a ref, you can retrieve the operation name by calling the `operationName` property on the addGroupParticipantRef:
+```typescript
+const name = addGroupParticipantRef.operationName;
+console.log(name);
+```
+
+### Variables
+The `AddGroupParticipant` mutation requires an argument of type `AddGroupParticipantVariables`, which is defined in [dataconnect-generated/index.d.ts](./index.d.ts). It has the following fields:
+
+```typescript
+export interface AddGroupParticipantVariables {
+  chatId: UUIDString;
+  userId: UUIDString;
+  isAdmin: boolean;
+  now: TimestampString;
+}
+```
+### Return Type
+Recall that executing the `AddGroupParticipant` mutation returns a `MutationPromise` that resolves to an object with a `data` property.
+
+The `data` property is an object of type `AddGroupParticipantData`, which is defined in [dataconnect-generated/index.d.ts](./index.d.ts). It has the following fields:
+```typescript
+export interface AddGroupParticipantData {
+  chatParticipant_insert: ChatParticipant_Key;
+}
+```
+### Using `AddGroupParticipant`'s action shortcut function
+
+```typescript
+import { getDataConnect } from 'firebase/data-connect';
+import { connectorConfig, addGroupParticipant, AddGroupParticipantVariables } from '@dataconnect/generated';
+
+// The `AddGroupParticipant` mutation requires an argument of type `AddGroupParticipantVariables`:
+const addGroupParticipantVars: AddGroupParticipantVariables = {
+  chatId: ..., 
+  userId: ..., 
+  isAdmin: ..., 
+  now: ..., 
+};
+
+// Call the `addGroupParticipant()` function to execute the mutation.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await addGroupParticipant(addGroupParticipantVars);
+// Variables can be defined inline as well.
+const { data } = await addGroupParticipant({ chatId: ..., userId: ..., isAdmin: ..., now: ..., });
+
+// You can also pass in a `DataConnect` instance to the action shortcut function.
+const dataConnect = getDataConnect(connectorConfig);
+const { data } = await addGroupParticipant(dataConnect, addGroupParticipantVars);
+
+console.log(data.chatParticipant_insert);
+
+// Or, you can use the `Promise` API.
+addGroupParticipant(addGroupParticipantVars).then((response) => {
+  const data = response.data;
+  console.log(data.chatParticipant_insert);
+});
+```
+
+### Using `AddGroupParticipant`'s `MutationRef` function
+
+```typescript
+import { getDataConnect, executeMutation } from 'firebase/data-connect';
+import { connectorConfig, addGroupParticipantRef, AddGroupParticipantVariables } from '@dataconnect/generated';
+
+// The `AddGroupParticipant` mutation requires an argument of type `AddGroupParticipantVariables`:
+const addGroupParticipantVars: AddGroupParticipantVariables = {
+  chatId: ..., 
+  userId: ..., 
+  isAdmin: ..., 
+  now: ..., 
+};
+
+// Call the `addGroupParticipantRef()` function to get a reference to the mutation.
+const ref = addGroupParticipantRef(addGroupParticipantVars);
+// Variables can be defined inline as well.
+const ref = addGroupParticipantRef({ chatId: ..., userId: ..., isAdmin: ..., now: ..., });
+
+// You can also pass in a `DataConnect` instance to the `MutationRef` function.
+const dataConnect = getDataConnect(connectorConfig);
+const ref = addGroupParticipantRef(dataConnect, addGroupParticipantVars);
+
+// Call `executeMutation()` on the reference to execute the mutation.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await executeMutation(ref);
+
+console.log(data.chatParticipant_insert);
+
+// Or, you can use the `Promise` API.
+executeMutation(ref).then((response) => {
+  const data = response.data;
+  console.log(data.chatParticipant_insert);
+});
+```
+
+## UpdateGroupParticipant
+You can execute the `UpdateGroupParticipant` mutation using the following action shortcut function, or by calling `executeMutation()` after calling the following `MutationRef` function, both of which are defined in [dataconnect-generated/index.d.ts](./index.d.ts):
+```typescript
+updateGroupParticipant(vars: UpdateGroupParticipantVariables): MutationPromise<UpdateGroupParticipantData, UpdateGroupParticipantVariables>;
+
+interface UpdateGroupParticipantRef {
+  ...
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: UpdateGroupParticipantVariables): MutationRef<UpdateGroupParticipantData, UpdateGroupParticipantVariables>;
+}
+export const updateGroupParticipantRef: UpdateGroupParticipantRef;
+```
+You can also pass in a `DataConnect` instance to the action shortcut function or `MutationRef` function.
+```typescript
+updateGroupParticipant(dc: DataConnect, vars: UpdateGroupParticipantVariables): MutationPromise<UpdateGroupParticipantData, UpdateGroupParticipantVariables>;
+
+interface UpdateGroupParticipantRef {
+  ...
+  (dc: DataConnect, vars: UpdateGroupParticipantVariables): MutationRef<UpdateGroupParticipantData, UpdateGroupParticipantVariables>;
+}
+export const updateGroupParticipantRef: UpdateGroupParticipantRef;
+```
+
+If you need the name of the operation without creating a ref, you can retrieve the operation name by calling the `operationName` property on the updateGroupParticipantRef:
+```typescript
+const name = updateGroupParticipantRef.operationName;
+console.log(name);
+```
+
+### Variables
+The `UpdateGroupParticipant` mutation requires an argument of type `UpdateGroupParticipantVariables`, which is defined in [dataconnect-generated/index.d.ts](./index.d.ts). It has the following fields:
+
+```typescript
+export interface UpdateGroupParticipantVariables {
+  chatId: UUIDString;
+  userId: UUIDString;
+  isAdmin?: boolean | null;
+  status?: string | null;
+}
+```
+### Return Type
+Recall that executing the `UpdateGroupParticipant` mutation returns a `MutationPromise` that resolves to an object with a `data` property.
+
+The `data` property is an object of type `UpdateGroupParticipantData`, which is defined in [dataconnect-generated/index.d.ts](./index.d.ts). It has the following fields:
+```typescript
+export interface UpdateGroupParticipantData {
+  chatParticipant_update?: ChatParticipant_Key | null;
+}
+```
+### Using `UpdateGroupParticipant`'s action shortcut function
+
+```typescript
+import { getDataConnect } from 'firebase/data-connect';
+import { connectorConfig, updateGroupParticipant, UpdateGroupParticipantVariables } from '@dataconnect/generated';
+
+// The `UpdateGroupParticipant` mutation requires an argument of type `UpdateGroupParticipantVariables`:
+const updateGroupParticipantVars: UpdateGroupParticipantVariables = {
+  chatId: ..., 
+  userId: ..., 
+  isAdmin: ..., // optional
+  status: ..., // optional
+};
+
+// Call the `updateGroupParticipant()` function to execute the mutation.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await updateGroupParticipant(updateGroupParticipantVars);
+// Variables can be defined inline as well.
+const { data } = await updateGroupParticipant({ chatId: ..., userId: ..., isAdmin: ..., status: ..., });
+
+// You can also pass in a `DataConnect` instance to the action shortcut function.
+const dataConnect = getDataConnect(connectorConfig);
+const { data } = await updateGroupParticipant(dataConnect, updateGroupParticipantVars);
+
+console.log(data.chatParticipant_update);
+
+// Or, you can use the `Promise` API.
+updateGroupParticipant(updateGroupParticipantVars).then((response) => {
+  const data = response.data;
+  console.log(data.chatParticipant_update);
+});
+```
+
+### Using `UpdateGroupParticipant`'s `MutationRef` function
+
+```typescript
+import { getDataConnect, executeMutation } from 'firebase/data-connect';
+import { connectorConfig, updateGroupParticipantRef, UpdateGroupParticipantVariables } from '@dataconnect/generated';
+
+// The `UpdateGroupParticipant` mutation requires an argument of type `UpdateGroupParticipantVariables`:
+const updateGroupParticipantVars: UpdateGroupParticipantVariables = {
+  chatId: ..., 
+  userId: ..., 
+  isAdmin: ..., // optional
+  status: ..., // optional
+};
+
+// Call the `updateGroupParticipantRef()` function to get a reference to the mutation.
+const ref = updateGroupParticipantRef(updateGroupParticipantVars);
+// Variables can be defined inline as well.
+const ref = updateGroupParticipantRef({ chatId: ..., userId: ..., isAdmin: ..., status: ..., });
+
+// You can also pass in a `DataConnect` instance to the `MutationRef` function.
+const dataConnect = getDataConnect(connectorConfig);
+const ref = updateGroupParticipantRef(dataConnect, updateGroupParticipantVars);
+
+// Call `executeMutation()` on the reference to execute the mutation.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await executeMutation(ref);
+
+console.log(data.chatParticipant_update);
+
+// Or, you can use the `Promise` API.
+executeMutation(ref).then((response) => {
+  const data = response.data;
+  console.log(data.chatParticipant_update);
+});
+```
+
+## RemoveGroupParticipant
+You can execute the `RemoveGroupParticipant` mutation using the following action shortcut function, or by calling `executeMutation()` after calling the following `MutationRef` function, both of which are defined in [dataconnect-generated/index.d.ts](./index.d.ts):
+```typescript
+removeGroupParticipant(vars: RemoveGroupParticipantVariables): MutationPromise<RemoveGroupParticipantData, RemoveGroupParticipantVariables>;
+
+interface RemoveGroupParticipantRef {
+  ...
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: RemoveGroupParticipantVariables): MutationRef<RemoveGroupParticipantData, RemoveGroupParticipantVariables>;
+}
+export const removeGroupParticipantRef: RemoveGroupParticipantRef;
+```
+You can also pass in a `DataConnect` instance to the action shortcut function or `MutationRef` function.
+```typescript
+removeGroupParticipant(dc: DataConnect, vars: RemoveGroupParticipantVariables): MutationPromise<RemoveGroupParticipantData, RemoveGroupParticipantVariables>;
+
+interface RemoveGroupParticipantRef {
+  ...
+  (dc: DataConnect, vars: RemoveGroupParticipantVariables): MutationRef<RemoveGroupParticipantData, RemoveGroupParticipantVariables>;
+}
+export const removeGroupParticipantRef: RemoveGroupParticipantRef;
+```
+
+If you need the name of the operation without creating a ref, you can retrieve the operation name by calling the `operationName` property on the removeGroupParticipantRef:
+```typescript
+const name = removeGroupParticipantRef.operationName;
+console.log(name);
+```
+
+### Variables
+The `RemoveGroupParticipant` mutation requires an argument of type `RemoveGroupParticipantVariables`, which is defined in [dataconnect-generated/index.d.ts](./index.d.ts). It has the following fields:
+
+```typescript
+export interface RemoveGroupParticipantVariables {
+  chatId: UUIDString;
+  userId: UUIDString;
+}
+```
+### Return Type
+Recall that executing the `RemoveGroupParticipant` mutation returns a `MutationPromise` that resolves to an object with a `data` property.
+
+The `data` property is an object of type `RemoveGroupParticipantData`, which is defined in [dataconnect-generated/index.d.ts](./index.d.ts). It has the following fields:
+```typescript
+export interface RemoveGroupParticipantData {
+  chatParticipant_delete?: ChatParticipant_Key | null;
+}
+```
+### Using `RemoveGroupParticipant`'s action shortcut function
+
+```typescript
+import { getDataConnect } from 'firebase/data-connect';
+import { connectorConfig, removeGroupParticipant, RemoveGroupParticipantVariables } from '@dataconnect/generated';
+
+// The `RemoveGroupParticipant` mutation requires an argument of type `RemoveGroupParticipantVariables`:
+const removeGroupParticipantVars: RemoveGroupParticipantVariables = {
+  chatId: ..., 
+  userId: ..., 
+};
+
+// Call the `removeGroupParticipant()` function to execute the mutation.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await removeGroupParticipant(removeGroupParticipantVars);
+// Variables can be defined inline as well.
+const { data } = await removeGroupParticipant({ chatId: ..., userId: ..., });
+
+// You can also pass in a `DataConnect` instance to the action shortcut function.
+const dataConnect = getDataConnect(connectorConfig);
+const { data } = await removeGroupParticipant(dataConnect, removeGroupParticipantVars);
+
+console.log(data.chatParticipant_delete);
+
+// Or, you can use the `Promise` API.
+removeGroupParticipant(removeGroupParticipantVars).then((response) => {
+  const data = response.data;
+  console.log(data.chatParticipant_delete);
+});
+```
+
+### Using `RemoveGroupParticipant`'s `MutationRef` function
+
+```typescript
+import { getDataConnect, executeMutation } from 'firebase/data-connect';
+import { connectorConfig, removeGroupParticipantRef, RemoveGroupParticipantVariables } from '@dataconnect/generated';
+
+// The `RemoveGroupParticipant` mutation requires an argument of type `RemoveGroupParticipantVariables`:
+const removeGroupParticipantVars: RemoveGroupParticipantVariables = {
+  chatId: ..., 
+  userId: ..., 
+};
+
+// Call the `removeGroupParticipantRef()` function to get a reference to the mutation.
+const ref = removeGroupParticipantRef(removeGroupParticipantVars);
+// Variables can be defined inline as well.
+const ref = removeGroupParticipantRef({ chatId: ..., userId: ..., });
+
+// You can also pass in a `DataConnect` instance to the `MutationRef` function.
+const dataConnect = getDataConnect(connectorConfig);
+const ref = removeGroupParticipantRef(dataConnect, removeGroupParticipantVars);
+
+// Call `executeMutation()` on the reference to execute the mutation.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await executeMutation(ref);
+
+console.log(data.chatParticipant_delete);
+
+// Or, you can use the `Promise` API.
+executeMutation(ref).then((response) => {
+  const data = response.data;
+  console.log(data.chatParticipant_delete);
+});
+```
+
+## UpdateGroupMetadata
+You can execute the `UpdateGroupMetadata` mutation using the following action shortcut function, or by calling `executeMutation()` after calling the following `MutationRef` function, both of which are defined in [dataconnect-generated/index.d.ts](./index.d.ts):
+```typescript
+updateGroupMetadata(vars: UpdateGroupMetadataVariables): MutationPromise<UpdateGroupMetadataData, UpdateGroupMetadataVariables>;
+
+interface UpdateGroupMetadataRef {
+  ...
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: UpdateGroupMetadataVariables): MutationRef<UpdateGroupMetadataData, UpdateGroupMetadataVariables>;
+}
+export const updateGroupMetadataRef: UpdateGroupMetadataRef;
+```
+You can also pass in a `DataConnect` instance to the action shortcut function or `MutationRef` function.
+```typescript
+updateGroupMetadata(dc: DataConnect, vars: UpdateGroupMetadataVariables): MutationPromise<UpdateGroupMetadataData, UpdateGroupMetadataVariables>;
+
+interface UpdateGroupMetadataRef {
+  ...
+  (dc: DataConnect, vars: UpdateGroupMetadataVariables): MutationRef<UpdateGroupMetadataData, UpdateGroupMetadataVariables>;
+}
+export const updateGroupMetadataRef: UpdateGroupMetadataRef;
+```
+
+If you need the name of the operation without creating a ref, you can retrieve the operation name by calling the `operationName` property on the updateGroupMetadataRef:
+```typescript
+const name = updateGroupMetadataRef.operationName;
+console.log(name);
+```
+
+### Variables
+The `UpdateGroupMetadata` mutation requires an argument of type `UpdateGroupMetadataVariables`, which is defined in [dataconnect-generated/index.d.ts](./index.d.ts). It has the following fields:
+
+```typescript
+export interface UpdateGroupMetadataVariables {
+  chatId: UUIDString;
+  groupName?: string | null;
+  groupImageUrl?: string | null;
+  groupDescription?: string | null;
+}
+```
+### Return Type
+Recall that executing the `UpdateGroupMetadata` mutation returns a `MutationPromise` that resolves to an object with a `data` property.
+
+The `data` property is an object of type `UpdateGroupMetadataData`, which is defined in [dataconnect-generated/index.d.ts](./index.d.ts). It has the following fields:
+```typescript
+export interface UpdateGroupMetadataData {
+  chat_update?: Chat_Key | null;
+}
+```
+### Using `UpdateGroupMetadata`'s action shortcut function
+
+```typescript
+import { getDataConnect } from 'firebase/data-connect';
+import { connectorConfig, updateGroupMetadata, UpdateGroupMetadataVariables } from '@dataconnect/generated';
+
+// The `UpdateGroupMetadata` mutation requires an argument of type `UpdateGroupMetadataVariables`:
+const updateGroupMetadataVars: UpdateGroupMetadataVariables = {
+  chatId: ..., 
+  groupName: ..., // optional
+  groupImageUrl: ..., // optional
+  groupDescription: ..., // optional
+};
+
+// Call the `updateGroupMetadata()` function to execute the mutation.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await updateGroupMetadata(updateGroupMetadataVars);
+// Variables can be defined inline as well.
+const { data } = await updateGroupMetadata({ chatId: ..., groupName: ..., groupImageUrl: ..., groupDescription: ..., });
+
+// You can also pass in a `DataConnect` instance to the action shortcut function.
+const dataConnect = getDataConnect(connectorConfig);
+const { data } = await updateGroupMetadata(dataConnect, updateGroupMetadataVars);
+
+console.log(data.chat_update);
+
+// Or, you can use the `Promise` API.
+updateGroupMetadata(updateGroupMetadataVars).then((response) => {
+  const data = response.data;
+  console.log(data.chat_update);
+});
+```
+
+### Using `UpdateGroupMetadata`'s `MutationRef` function
+
+```typescript
+import { getDataConnect, executeMutation } from 'firebase/data-connect';
+import { connectorConfig, updateGroupMetadataRef, UpdateGroupMetadataVariables } from '@dataconnect/generated';
+
+// The `UpdateGroupMetadata` mutation requires an argument of type `UpdateGroupMetadataVariables`:
+const updateGroupMetadataVars: UpdateGroupMetadataVariables = {
+  chatId: ..., 
+  groupName: ..., // optional
+  groupImageUrl: ..., // optional
+  groupDescription: ..., // optional
+};
+
+// Call the `updateGroupMetadataRef()` function to get a reference to the mutation.
+const ref = updateGroupMetadataRef(updateGroupMetadataVars);
+// Variables can be defined inline as well.
+const ref = updateGroupMetadataRef({ chatId: ..., groupName: ..., groupImageUrl: ..., groupDescription: ..., });
+
+// You can also pass in a `DataConnect` instance to the `MutationRef` function.
+const dataConnect = getDataConnect(connectorConfig);
+const ref = updateGroupMetadataRef(dataConnect, updateGroupMetadataVars);
+
+// Call `executeMutation()` on the reference to execute the mutation.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await executeMutation(ref);
+
+console.log(data.chat_update);
+
+// Or, you can use the `Promise` API.
+executeMutation(ref).then((response) => {
+  const data = response.data;
+  console.log(data.chat_update);
 });
 ```
 

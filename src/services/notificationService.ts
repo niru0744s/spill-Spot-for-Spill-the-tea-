@@ -31,7 +31,9 @@ Notifications.setNotificationHandler({
  */
 export async function registerForPushNotificationsAsync(uid: string): Promise<string | null> {
   if (!Device.isDevice) {
-    console.log('[NotificationService] Must use a physical device for Push Notifications');
+    if (__DEV__) {
+      console.log('[NotificationService] Must use a physical device for Push Notifications');
+    }
     return null;
   }
 
@@ -85,7 +87,9 @@ export async function registerForPushNotificationsAsync(uid: string): Promise<st
       });
     }
 
-    console.log('[NotificationService] Push notification token successfully registered:', token);
+    if (__DEV__) {
+      console.log('[NotificationService] Push token registered:', token);
+    }
     return token;
   } catch (error) {
     console.error('[NotificationService] Error during registration:', error);
@@ -115,6 +119,18 @@ export async function sendPushNotification({
     data,
   };
 
+  // Validate Expo push token format before sending — prevents silent API failures
+  const isValidToken =
+    to.startsWith('ExponentPushToken[') ||
+    to.startsWith('ExpoPushToken[');
+
+  if (!isValidToken) {
+    if (__DEV__) {
+      console.warn('[NotificationService] Skipping push — invalid token format:', to);
+    }
+    return;
+  }
+
   try {
     const response = await fetch('https://exp.host/--/api/v2/push/send', {
       method: 'POST',
@@ -127,8 +143,10 @@ export async function sendPushNotification({
     });
 
     const result = await response.json();
-    console.log('[NotificationService] Send notification API response:', result);
+    if (__DEV__) {
+      console.log('[NotificationService] Push API response:', result);
+    }
   } catch (error) {
-    console.error('[NotificationService] Failed to send push notification via Expo Push API:', error);
+    console.error('[NotificationService] Failed to send push notification:', error);
   }
 }

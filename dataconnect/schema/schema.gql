@@ -14,6 +14,9 @@ type Chat @table {
   createdAt: Timestamp!
   lastMessageText: String
   lastMessageAt: Timestamp
+  groupName: String
+  groupImageUrl: String
+  groupDescription: String
 }
 
 type ChatParticipant @table(key: ["chat", "user"]) {
@@ -21,12 +24,14 @@ type ChatParticipant @table(key: ["chat", "user"]) {
   user: User!
   joinedAt: Timestamp!
   unreadCount: Int!
+  isAdmin: Boolean
+  status: String
 }
 
 type Message @table {
   chat: Chat!
   sender: User!
-  receiver: User!
+  receiver: User
   messageType: String!
   content: String!
   createdAt: Timestamp!

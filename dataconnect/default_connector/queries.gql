@@ -10,8 +10,55 @@ query GetMyChats @auth(level: USER) {
       isGroup
       lastMessageText
       lastMessageAt
+      groupName
+      groupImageUrl
+      groupDescription
     }
     unreadCount
+    isAdmin
+    status
+  }
+}
+
+# Fetch details of a specific chat (e.g. group chat metadata and members).
+query GetChatDetails($chatId: UUID!) @auth(level: USER) {
+  chat(id: $chatId) {
+    id
+    isGroup
+    groupName
+    groupImageUrl
+    groupDescription
+    createdAt
+    chatParticipants_on_chat {
+      user {
+        id
+        username
+        name
+        profilePictureUrl
+        bio
+        lastOnlineAt
+      }
+      joinedAt
+      unreadCount
+      isAdmin
+      status
+    }
+  }
+}
+
+# Fetch all groups for public discovery (where isGroup is true).
+query GetDiscoverGroups @auth(level: USER) {
+  chats(where: { isGroup: { eq: true } }) {
+    id
+    groupName
+    groupImageUrl
+    groupDescription
+    createdAt
+    chatParticipants_on_chat {
+      user {
+        id
+      }
+    }
   }
 }
 

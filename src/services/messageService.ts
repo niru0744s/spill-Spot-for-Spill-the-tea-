@@ -40,6 +40,29 @@ import {
   type ChatMeta,
 } from './chatStorage';
 import { sendPushNotification } from './notificationService';
+import { storage } from './mmkv';
+
+// ---------------------------------------------------------------------------
+// Push token MMKV cache  (avoids one Firestore read per outgoing message)
+// ---------------------------------------------------------------------------
+
+const PUSH_TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+function ptKey(uid: string)   { return `push_token_${uid}`; }
+function ptTsKey(uid: string) { return `push_token_ts_${uid}`; }
+
+function getCachedPushToken(uid: string): string | null {
+  const token = storage.getString(ptKey(uid));
+  const ts    = storage.getNumber(ptTsKey(uid));
+  if (!token || !ts) return null;
+  if (Date.now() - ts > PUSH_TOKEN_TTL_MS) return null; // expired
+  return token;
+}
+
+function cachePushToken(uid: string, token: string): void {
+  storage.set(ptKey(uid), token);
+  storage.set(ptTsKey(uid), Date.now());
+}
 
 // ---------------------------------------------------------------------------
 // Firestore path helper
@@ -183,18 +206,34 @@ async function uploadToFirestore(chatId: string, msg: StoredMessage, partnerUid?
 
     // Send Push Notification if receiver has registered a token
     try {
-      const partnerSnap = await getDoc(doc(db, 'users', actualPartnerUid));
-      if (partnerSnap.exists()) {
-        const partnerData = partnerSnap.data();
-        const pushToken = partnerData?.pushToken;
-        if (pushToken) {
-          await sendPushNotification({
-            to: pushToken,
-            title: senderName,
-            body: msg.content,
-            data: { chatId, senderUid: msg.senderUid },
-          });
+      // 1. Check MMKV cache before hitting Firestore
+      let pushToken = getCachedPushToken(actualPartnerUid);
+
+      if (!pushToken) {
+        // 2. Cache miss — fetch from Firestore then cache the result
+        const partnerSnap = await getDoc(doc(db, 'users', actualPartnerUid));
+        if (partnerSnap.exists()) {
+          const tokenFromStore = partnerSnap.data()?.pushToken as string | undefined;
+          if (tokenFromStore) {
+            pushToken = tokenFromStore;
+            cachePushToken(actualPartnerUid, tokenFromStore);
+          }
         }
+      }
+
+      if (pushToken) {
+        await sendPushNotification({
+          to: pushToken,
+          title: senderName,
+          body: msg.content,
+          data: {
+            chatId,
+            senderUid:     msg.senderUid,
+            senderName:    senderName,
+            partnerPhoto:  senderPhoto ?? 'null',
+            partnerOnline: 'true',
+          },
+        });
       }
     } catch (notifErr) {
       console.warn('[messageService] Failed to deliver push notification:', notifErr);
@@ -218,6 +257,19 @@ export async function markMessageDelivered(
     const msgRef = doc(db, 'chats', chatId, 'messages', messageId);
     await updateDoc(msgRef, { status: 'DELIVERED' });
     updateMessageStatus(chatId, messageId, 'DELIVERED');
+  } catch {
+    // Non-critical — ignore failures
+  }
+}
+
+export async function markMessageRead(
+  chatId: string,
+  messageId: string
+): Promise<void> {
+  try {
+    const msgRef = doc(db, 'chats', chatId, 'messages', messageId);
+    await updateDoc(msgRef, { status: 'READ' });
+    updateMessageStatus(chatId, messageId, 'READ');
   } catch {
     // Non-critical — ignore failures
   }

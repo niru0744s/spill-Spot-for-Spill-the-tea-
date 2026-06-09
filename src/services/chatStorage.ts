@@ -25,6 +25,8 @@ export interface StoredMessage {
   id: string;           // UUID generated locally (expo-crypto)
   chatId: string;
   senderUid: string;
+  senderName?: string;
+  senderPhoto?: string | null;
   content: string;
   type: 'TEXT' | 'IMAGE';
   status: MessageStatus;
@@ -41,6 +43,8 @@ export interface ChatMeta {
   lastMessage: string;
   lastMessageAt: number;
   isBackedUp: boolean;
+  isGroup?: boolean;
+  status?: string;
 }
 
 // ---------------------------------------------------------------------------

@@ -215,7 +215,7 @@ export default function LoginScreen() {
       <VortexBackground />
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.kav}
       >
         <ScrollView
@@ -491,11 +491,6 @@ const styles = StyleSheet.create({
   inputRowFocused: {
     borderColor: C.inputFocusBorder,
     backgroundColor: 'rgba(49,54,47,0.5)',
-    shadowColor: '#96f996',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-    elevation: 4,
   },
   inputIcon: {
     marginRight: 12,

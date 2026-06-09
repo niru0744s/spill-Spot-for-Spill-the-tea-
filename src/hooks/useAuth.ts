@@ -54,6 +54,7 @@ import {
 
 import { auth, db, storage } from "@/config/firebase";
 import { useAuthStore, type UserProfile } from "@/store/authStore";
+import { uploadProfilePhotoToSupabase } from "@/services/supabaseService";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -328,14 +329,14 @@ export function useAuth() {
   // updateProfilePhoto
   // -------------------------------------------------------------------------
   /**
-   * Uploads a local image URI to Firebase Storage under `profile_photos/{uid}`,
+   * Uploads a base64 image string to Supabase Storage under `avatars/{uid}_avatar.jpg`,
    * then updates the Firestore profile and Firebase Auth photoURL.
    *
-   * @param localUri - A local file URI (e.g. from expo-image-picker or expo-camera).
+   * @param base64Data - The base64 data string of the picked image.
    * @returns The remote download URL on success, or null on failure.
    */
   const updateProfilePhoto = useCallback(
-    async (localUri: string): Promise<string | null> => {
+    async (base64Data: string): Promise<string | null> => {
       if (!firebaseUser) {
         setError("You must be signed in to update your profile photo.");
         return null;
@@ -345,31 +346,13 @@ export function useAuth() {
       setError(null);
 
       try {
-        // 1. Fetch the local image as a blob
-        const response = await fetch(localUri);
-        const blob = await response.blob();
+        // 1. Upload directly to Supabase Storage via lightweight fetch using base64 data
+        const downloadURL = await uploadProfilePhotoToSupabase(base64Data, firebaseUser.uid);
+        if (!downloadURL) {
+          throw new Error("Failed to get public download URL from Supabase Storage.");
+        }
 
-        // 2. Build a Storage reference
-        const photoRef = ref(
-          storage,
-          `profile_photos/${firebaseUser.uid}/avatar`
-        );
-
-        // 3. Upload with resumable upload for large images
-        await new Promise<void>((resolve, reject) => {
-          const uploadTask = uploadBytesResumable(photoRef, blob);
-          uploadTask.on(
-            "state_changed",
-            null, // progress handler — hook callers can subscribe via Storage if needed
-            (uploadError: Error) => reject(uploadError),
-            () => resolve()
-          );
-        });
-
-        // 4. Get the public download URL
-        const downloadURL = await getDownloadURL(photoRef);
-
-        // 5. Persist to Firestore + Firebase Auth
+        // 2. Persist to Firestore + Firebase Auth
         await updateProfile({ photoURL: downloadURL });
 
         return downloadURL;
@@ -384,58 +367,44 @@ export function useAuth() {
   );
 
   // -------------------------------------------------------------------------
-  // useSessionListener
+  // saveNiches
   // -------------------------------------------------------------------------
   /**
-   * Wires up Firebase's `onAuthStateChanged` listener.
+   * Persists the user's selected interest niches to Firestore `/users/{uid}`.
+   * Called once after the onboarding niche selection screen completes.
    *
-   * Call this ONCE at the root of your app (e.g. in `src/app/_layout.tsx`):
-   *
-   *   const { useSessionListener } = useAuth();
-   *   useSessionListener();
-   *
-   * It will:
-   *  - Restore a persisted session on cold start
-   *  - Fetch the Firestore user profile automatically
-   *  - Flip `isInitialized` so you can safely render the navigator
-   *  - Clean up the listener on unmount
+   * @param niches - Array of niche strings (3–5 items).
    */
-  const useSessionListener = () => {
-    useEffect(() => {
-      const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
-        if (fbUser) {
-          setFirebaseUser(fbUser);
+  const saveNiches = useCallback(
+    async (niches: string[]): Promise<void> => {
+      if (!firebaseUser) {
+        setError("You must be signed in to save your niches.");
+        return;
+      }
 
-          try {
-            // Mark online + update lastSeen on app open
-            await updateDoc(doc(db, "users", fbUser.uid), {
-              isOnline: true,
-              lastSeen: serverTimestamp(),
-              updatedAt: serverTimestamp(),
-            }).catch(() => {
-              // Silently ignore if the doc doesn't exist yet (race on signup)
-            });
+      setLoading(true);
+      setError(null);
 
-            const profile = await fetchProfileDoc(fbUser.uid);
-            setUser(profile);
-          } catch {
-            // Profile fetch failed — user is still authenticated
-            setUser(null);
-          }
-        } else {
-          // Signed out or no persisted session
-          setFirebaseUser(null);
-          setUser(null);
-        }
+      try {
+        // 1. Write niches + updatedAt to Firestore
+        await updateDoc(doc(db, "users", firebaseUser.uid), {
+          niches,
+          updatedAt: serverTimestamp(),
+        });
 
-        // Always flip initialized after first callback, regardless of outcome
-        setInitialized(true);
-      });
-
-      return () => unsubscribe();
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-  };
+        // 2. Update store optimistically — only `niches` changed, no need to
+        //    re-fetch the entire profile document (saves one Firestore read).
+        //    Use getState() to avoid a stale-closure on the `user` variable.
+        const current = useAuthStore.getState().user;
+        if (current) setUser({ ...current, niches });
+      } catch (err) {
+        setError(parseAuthError(err));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [firebaseUser, setLoading, setError, setUser]
+  );
 
   // -------------------------------------------------------------------------
   // Return public API
@@ -457,8 +426,71 @@ export function useAuth() {
     fetchUserProfile,
     updateProfile,
     updateProfilePhoto,
-
-    // ── Session ────────────────────────────────────────────────────────────
-    useSessionListener,
+    saveNiches,
   } as const;
+}
+
+// ---------------------------------------------------------------------------
+// useSessionListener — standalone hook (React-rules-compliant)
+// ---------------------------------------------------------------------------
+/**
+ * Wires up Firebase's `onAuthStateChanged` listener.
+ *
+ * Call this ONCE at the top level of your root component:
+ *
+ *   import { useSessionListener } from '@/hooks/useAuth';
+ *   // inside RootLayout:
+ *   useSessionListener();
+ *
+ * Behaviour:
+ *  - Restores a persisted session on cold start
+ *  - Fetches the Firestore user profile automatically
+ *  - Marks the user online + updates lastSeen
+ *  - Flips `isInitialized` so the navigator can safely render
+ *  - Cleans up the Firebase listener on unmount
+ *
+ * Extracted from useAuth() so that useEffect is called at the top
+ * level of a proper hook — satisfying React's Rules of Hooks.
+ */
+export function useSessionListener(): void {
+  // Access store setters directly — no circular dependency with useAuth()
+  const setFirebaseUser = useAuthStore((s) => s.setFirebaseUser);
+  const setUser         = useAuthStore((s) => s.setUser);
+  const setInitialized  = useAuthStore((s) => s.setInitialized);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+      if (fbUser) {
+        setFirebaseUser(fbUser);
+
+        try {
+          // Mark online + update lastSeen on app open
+          await updateDoc(doc(db, 'users', fbUser.uid), {
+            isOnline:  true,
+            lastSeen:  serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          }).catch(() => {
+            // Silently ignore if the doc doesn't exist yet (race on signup)
+          });
+
+          const profile = await fetchProfileDoc(fbUser.uid);
+          setUser(profile);
+        } catch {
+          // Profile fetch failed — user is still authenticated
+          setUser(null);
+        }
+      } else {
+        // Signed out or no persisted session
+        setFirebaseUser(null);
+        setUser(null);
+      }
+
+      // Always flip initialized after first callback, regardless of outcome
+      setInitialized(true);
+    });
+
+    return () => unsubscribe();
+  // Store setter references from Zustand are stable — no need to list them
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 }

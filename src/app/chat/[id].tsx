@@ -26,7 +26,7 @@ import { buildChatId, clearDraft, getChatMeta, getDraft, saveChatMeta, saveDraft
 import { sendMessage as sendMsg } from '@/services/messageService';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
 import {
   useCallback,
   useEffect,
@@ -250,6 +250,8 @@ export default function ChatRoomScreen() {
   const chatId = buildChatId(currentUid, partnerUid);
 
   const [partnerOnline, setPartnerOnline] = useState(isOnline);
+  const [partnerPhotoURL, setPartnerPhotoURL] = useState<string | null>(photoURL);
+  const [partnerActiveChatId, setPartnerActiveChatId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   // Premium quick-load transition when entering a chat
@@ -261,7 +263,7 @@ export default function ChatRoomScreen() {
     return () => clearTimeout(timer);
   }, [chatId]);
 
-  // Sync partner online status in real-time & update local chat metadata cache
+  // Sync partner online status & photoURL in real-time & update local chat metadata cache
   useEffect(() => {
     if (!partnerUid) return;
     const partnerDocRef = doc(db, 'users', partnerUid);
@@ -269,7 +271,12 @@ export default function ChatRoomScreen() {
       if (docSnap.exists()) {
         const data = docSnap.data();
         const online = !!data.isOnline;
+        const activeChat = data.activeChatId ?? null;
+        const livePhoto = data.photoURL && data.photoURL !== 'null' ? data.photoURL : null;
+        
         setPartnerOnline(online);
+        setPartnerPhotoURL(livePhoto);
+        setPartnerActiveChatId(activeChat);
 
         // Update local metadata cache reactively
         const existingMeta = getChatMeta(chatId);
@@ -277,6 +284,7 @@ export default function ChatRoomScreen() {
           saveChatMeta({
             ...existingMeta,
             partnerOnline: online,
+            partnerPhoto: livePhoto,
           });
         }
       }
@@ -292,13 +300,13 @@ export default function ChatRoomScreen() {
       chatId,
       partnerUid,
       partnerName: username,
-      partnerPhoto: photoURL,
+      partnerPhoto: partnerPhotoURL,
       partnerOnline: partnerOnline,
       lastMessage: existing?.lastMessage ?? '',
       lastMessageAt: existing?.lastMessageAt ?? Date.now(),
       isBackedUp: existing?.isBackedUp ?? false,
     });
-  }, [chatId]);
+  }, [chatId, partnerPhotoURL, partnerOnline]);
 
   const {
     messages,
@@ -311,11 +319,20 @@ export default function ChatRoomScreen() {
     stopTyping,
   } = useRealtimeChat(chatId);
 
-  // Tell the global listener this chat is actively open
+  // Tell the global listener and Firestore that this chat is actively open
   useEffect(() => {
+    if (!currentUid) return;
     setActiveChatId(chatId);
-    return () => setActiveChatId(null);
-  }, [chatId]);
+
+    // Set activeChatId in Firestore
+    const userDocRef = doc(db, 'users', currentUid);
+    updateDoc(userDocRef, { activeChatId: chatId }).catch(() => {});
+
+    return () => {
+      setActiveChatId(null);
+      updateDoc(userDocRef, { activeChatId: null }).catch(() => {});
+    };
+  }, [chatId, currentUid]);
 
   // Mark partner messages as READ whenever this screen is active
   useEffect(() => { markAsRead(); }, [chatId]);
@@ -384,7 +401,7 @@ export default function ChatRoomScreen() {
   return (
     <KeyboardAvoidingView
       style={[styles.container, { paddingTop: insets.top }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior="padding"
       keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
     >
 
@@ -403,8 +420,8 @@ export default function ChatRoomScreen() {
 
         <TouchableOpacity style={styles.headerProfile} activeOpacity={0.85}>
           <View style={styles.headerAvatarWrap}>
-            {photoURL ? (
-              <Image source={{ uri: photoURL }} style={styles.headerAvatar} />
+            {partnerPhotoURL ? (
+              <Image source={{ uri: partnerPhotoURL }} style={styles.headerAvatar} />
             ) : (
               <View style={styles.headerAvatarFallback}>
                 <Text style={styles.headerAvatarInitial}>{getInitial(username)}</Text>
@@ -415,7 +432,13 @@ export default function ChatRoomScreen() {
           <View>
             <Text style={styles.headerName}>{username}</Text>
             <Text style={[styles.headerStatus, partnerOnline && styles.headerStatusOnline]}>
-              {isOtherTyping ? 'typing...' : partnerOnline ? 'Active now' : 'Offline'}
+              {isOtherTyping
+                ? 'typing...'
+                : partnerOnline
+                ? partnerActiveChatId === chatId
+                  ? 'on chat'
+                  : 'Active now'
+                : 'Offline'}
             </Text>
           </View>
         </TouchableOpacity>

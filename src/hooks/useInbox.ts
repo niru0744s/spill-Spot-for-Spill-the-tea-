@@ -9,27 +9,45 @@
  *   which happens on the first open of any chat screen.
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { getAllChats, getUnreadCount, type ChatMeta } from '@/services/chatStorage';
+import { storage } from '@/services/mmkv';
 
 export interface InboxItem extends ChatMeta {
   unreadCount: number;
 }
 
 export function useInbox() {
-  const [chats, setChats] = useState<InboxItem[]>(() => loadChats());
-
-  function loadChats(): InboxItem[] {
+  const loadChats = useCallback((): InboxItem[] => {
     return getAllChats().map((meta) => ({
       ...meta,
       unreadCount: getUnreadCount(meta.chatId),
     }));
-  }
+  }, []);
+
+  const [chats, setChats] = useState<InboxItem[]>(() => loadChats());
+
+  // Listen to MMKV updates in real-time
+  useEffect(() => {
+    const listener = storage.addOnValueChangedListener((key) => {
+      // Refresh the list when index, metadata, badges, or message caches update
+      if (
+        key === 'chats_index' ||
+        key.startsWith('chat_meta_') ||
+        key.startsWith('unread_') ||
+        key.startsWith('msgs_')
+      ) {
+        setChats(loadChats());
+      }
+    });
+
+    return () => listener.remove();
+  }, [loadChats]);
 
   /** Re-read from MMKV — call this on screen focus */
   const refresh = useCallback(() => {
     setChats(loadChats());
-  }, []);
+  }, [loadChats]);
 
   return { chats, refresh };
 }

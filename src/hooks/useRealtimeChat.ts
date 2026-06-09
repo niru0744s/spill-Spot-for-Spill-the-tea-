@@ -32,6 +32,7 @@ import {
   handleIncomingMessage,
   processRetryQueue,
   markMessageDelivered,
+  markMessageRead,
   markMessagesAsRead,
 } from '@/services/messageService';
 import { getMessages, updateMessageStatus, getChatMeta, saveChatMeta, type StoredMessage } from '@/services/chatStorage';
@@ -124,8 +125,8 @@ export function useRealtimeChat(chatId: string) {
             return [...prev, incoming];
           });
 
-          // Auto-mark as DELIVERED — lets sender see ✓✓ immediately
-          markMessageDelivered(chatId, msgId);
+          // Auto-mark as READ since we are already inside the active chat screen
+          markMessageRead(chatId, msgId);
         }
 
         // ── MODIFIED: status changed (SENT→DELIVERED→READ) ─────────────────

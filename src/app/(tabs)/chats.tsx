@@ -24,12 +24,11 @@ import {
   Easing,
   ScrollView,
   Dimensions,
-  SafeAreaView,
   Image,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useInbox, type InboxItem } from '@/hooks/useInbox';
 import { useAuth } from '@/hooks/useAuth';
 import { clearUnread } from '@/services/chatStorage';
@@ -60,32 +59,46 @@ function OrbBackground() {
   const orb2y = useRef(new Animated.Value(0)).current;
   const orb3x = useRef(new Animated.Value(0)).current;
   const orb3y = useRef(new Animated.Value(0)).current;
+  // Refs to the running loop instances so we can stop them on blur
+  const animsRef = useRef<Animated.CompositeAnimation[]>([]);
 
-  useEffect(() => {
-    const makeOrbit = (
-      ax: Animated.Value, ay: Animated.Value,
-      dx: number, dy: number, dur: number
-    ) => Animated.loop(
-      Animated.sequence([
-        Animated.parallel([
-          Animated.timing(ax, { toValue: dx, duration: dur / 3, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-          Animated.timing(ay, { toValue: dy, duration: dur / 3, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-        ]),
-        Animated.parallel([
-          Animated.timing(ax, { toValue: -dx * 0.5, duration: dur / 3, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-          Animated.timing(ay, { toValue: dy * 1.5, duration: dur / 3, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-        ]),
-        Animated.parallel([
-          Animated.timing(ax, { toValue: 0, duration: dur / 3, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-          Animated.timing(ay, { toValue: 0, duration: dur / 3, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-        ]),
-      ])
-    );
+  useFocusEffect(
+    useCallback(() => {
+      const makeOrbit = (
+        ax: Animated.Value, ay: Animated.Value,
+        dx: number, dy: number, dur: number
+      ) => Animated.loop(
+        Animated.sequence([
+          Animated.parallel([
+            Animated.timing(ax, { toValue: dx, duration: dur / 3, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+            Animated.timing(ay, { toValue: dy, duration: dur / 3, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+          ]),
+          Animated.parallel([
+            Animated.timing(ax, { toValue: -dx * 0.5, duration: dur / 3, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+            Animated.timing(ay, { toValue: dy * 1.5, duration: dur / 3, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+          ]),
+          Animated.parallel([
+            Animated.timing(ax, { toValue: 0, duration: dur / 3, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+            Animated.timing(ay, { toValue: 0, duration: dur / 3, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+          ]),
+        ])
+      );
 
-    makeOrbit(orb1x, orb1y, 30, 50, 25000).start();
-    makeOrbit(orb2x, orb2y, -40, -30, 30000).start();
-    makeOrbit(orb3x, orb3y, 25, -40, 28000).start();
-  }, []);
+      const a1 = makeOrbit(orb1x, orb1y, 30, 50, 25000);
+      const a2 = makeOrbit(orb2x, orb2y, -40, -30, 30000);
+      const a3 = makeOrbit(orb3x, orb3y, 25, -40, 28000);
+      animsRef.current = [a1, a2, a3];
+
+      a1.start();
+      a2.start();
+      a3.start();
+
+      return () => {
+        // Stop all loops when the tab loses focus — frees up the JS thread
+        animsRef.current.forEach(a => a.stop());
+      };
+    }, [])
+  );
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
@@ -98,6 +111,7 @@ function OrbBackground() {
     </View>
   );
 }
+
 
 /* ── Pulsing notification dot ──────────────────────────────── */
 function PulseDot() {
@@ -116,16 +130,20 @@ function PulseDot() {
 }
 
 /* ── "My Tea" story bubble ─────────────────────────────────── */
-function MyTeaBubble({ displayName }: { displayName: string }) {
+function MyTeaBubble({ displayName, photoURL }: { displayName: string; photoURL: string | null | undefined }) {
   return (
     <View style={styles.storyItem}>
       <View style={styles.myTeaRing}>
-        {/* Avatar initials */}
-        <View style={styles.myTeaAvatar}>
-          <Text style={styles.myTeaInitial}>
-            {displayName?.charAt(0)?.toUpperCase() ?? '?'}
-          </Text>
-        </View>
+        {/* Avatar initials or photo */}
+        {photoURL ? (
+          <Image source={{ uri: photoURL }} style={styles.myTeaAvatarImg} />
+        ) : (
+          <View style={styles.myTeaAvatar}>
+            <Text style={styles.myTeaInitial}>
+              {displayName?.charAt(0)?.toUpperCase() ?? '?'}
+            </Text>
+          </View>
+        )}
         {/* Add button */}
         <View style={styles.myTeaAddBtn}>
           <MaterialIcons name="add" size={10} color={C.onPrimaryContainer} />
@@ -300,7 +318,7 @@ export default function ChatsScreen() {
 
         {/* ── Scrollable content ──────────────────────────── */}
         <FlatList
-          data={chats}
+          data={chats.filter((c) => !c.isGroup)}
           keyExtractor={(item) => item.chatId}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
@@ -318,7 +336,7 @@ export default function ChatsScreen() {
                 contentContainerStyle={styles.storiesRow}
                 style={styles.storiesScroll}
               >
-                <MyTeaBubble displayName={user?.name ?? user?.displayName ?? 'Me'} />
+                <MyTeaBubble displayName={user?.name ?? user?.displayName ?? 'Me'} photoURL={user?.photoURL} />
               </ScrollView>
 
               <View style={{ height: 12 }} />
@@ -491,6 +509,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(122,220,125,0.15)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  myTeaAvatarImg: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
   },
   myTeaInitial: {
     fontSize: 22,

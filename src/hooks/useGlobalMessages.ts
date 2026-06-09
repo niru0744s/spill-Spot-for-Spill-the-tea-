@@ -36,10 +36,18 @@ import {
 import { getActiveChatId } from '@/services/activeChat';
 import { markMessageDelivered } from '@/services/messageService';
 
+import { useAuth } from '@/hooks/useAuth';
+
 export function useGlobalMessages() {
-  const currentUid  = auth.currentUser?.uid ?? '';
+  const { firebaseUser } = useAuth();
+  const currentUid = firebaseUser?.uid ?? '';
+  // Maximum number of background per-chat listeners to keep open at once.
+  // For users with many chats this prevents unbounded listener growth.
+  const MAX_CHAT_LISTENERS = 20;
   // Track per-chat message listeners so we don't double-attach
   const chatUnsubsRef = useRef<Map<string, Unsubscribe>>(new Map());
+  // Tracks insertion order (oldest first) for LRU pruning
+  const chatOrderRef  = useRef<string[]>([]);
 
   useEffect(() => {
     if (!currentUid) return;
@@ -49,8 +57,8 @@ export function useGlobalMessages() {
     const inboxQuery = query(inboxRef, orderBy('lastMessageAt', 'desc'));
 
     const unsubInbox = onSnapshot(inboxQuery, (snapshot) => {
-      snapshot.docChanges().forEach(async (change) => {
-        if (change.type !== 'added' && change.type !== 'modified') return;
+      for (const change of snapshot.docChanges()) {
+        if (change.type !== 'added' && change.type !== 'modified') continue;
 
         const data   = change.doc.data();
         const chatId = change.doc.id;
@@ -69,13 +77,23 @@ export function useGlobalMessages() {
           lastMessage:   data.lastMessage  ?? '',
           lastMessageAt: lastAt,
           isBackedUp:    false,
+          isGroup:       data.isGroup      ?? false,
+          status:        data.status       ?? 'ACTIVE',
         });
 
         // 2️⃣ Attach a messages listener for this chat (if not already attached)
         if (!chatUnsubsRef.current.has(chatId)) {
-          attachChatListener(chatId, currentUid, chatUnsubsRef.current);
+          // Prune the oldest listener if we've hit the cap
+          if (chatUnsubsRef.current.size >= MAX_CHAT_LISTENERS) {
+            const oldest = chatOrderRef.current.shift();
+            if (oldest) {
+              chatUnsubsRef.current.get(oldest)?.();
+              chatUnsubsRef.current.delete(oldest);
+            }
+          }
+          attachChatListener(chatId, currentUid, chatUnsubsRef.current, chatOrderRef.current);
         }
-      });
+      }
     });
 
     return () => {
@@ -83,6 +101,7 @@ export function useGlobalMessages() {
       // Detach all per-chat listeners on unmount
       chatUnsubsRef.current.forEach(unsub => unsub());
       chatUnsubsRef.current.clear();
+      chatOrderRef.current = [];
     };
   }, [currentUid]);
 }
@@ -95,7 +114,8 @@ export function useGlobalMessages() {
 function attachChatListener(
   chatId: string,
   currentUid: string,
-  registry: Map<string, Unsubscribe>
+  registry: Map<string, Unsubscribe>,
+  order: string[]
 ): void {
   const msgsRef  = collection(db, 'chats', chatId, 'messages');
   const msgsQuery = query(msgsRef, orderBy('createdAt', 'asc'));
@@ -144,4 +164,5 @@ function attachChatListener(
   });
 
   registry.set(chatId, unsub);
+  order.push(chatId); // record insertion order for LRU pruning
 }
