@@ -9,35 +9,84 @@
  * auth and non-auth screens on cold start).
  */
 
-import { Stack, useRouter, useSegments } from "expo-router";
-import { useAuth } from "@/hooks/useAuth";
-import { useEffect } from "react";
-import { View, ActivityIndicator, StatusBar } from "react-native";
+import { useAuth, useSessionListener } from "@/hooks/useAuth";
 import { useGlobalMessages } from "@/hooks/useGlobalMessages";
+import { registerForPushNotificationsAsync } from "@/services/notificationService";
+import * as Notifications from "expo-notifications";
+import { Stack, useRouter, useSegments } from "expo-router";
+import { useEffect } from "react";
+import { ActivityIndicator, StatusBar, View } from "react-native";
 
 export default function RootLayout() {
-  const { useSessionListener, isInitialized, firebaseUser } = useAuth();
+  const { isInitialized, firebaseUser, user } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
+  // 🔥 Wire up Firebase auth session listener — runs for entire app lifetime
   useSessionListener();
 
   // 🌐 Global background message listener — runs for entire app session
   useGlobalMessages();
 
+  // 🔔 Register for push notifications when user is authenticated
+  useEffect(() => {
+    if (firebaseUser) {
+      registerForPushNotificationsAsync(firebaseUser.uid);
+    }
+  }, [firebaseUser]);
+
+  // 🔔 Listen for push notification taps and route to chat
+  useEffect(() => {
+    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response.notification.request.content.data;
+      const partnerUid = data?.senderUid ? String(data.senderUid) : '';
+      const username = data?.senderName ? String(data.senderName) : 'Tea Friend';
+      const photoURL = data?.partnerPhoto ? String(data.partnerPhoto) : 'null';
+      const isOnline = data?.partnerOnline ? String(data.partnerOnline) : 'false';
+
+      if (partnerUid) {
+        router.push({
+          pathname: '/chat/[id]',
+          params: {
+            id: partnerUid,
+            username,
+            photoURL,
+            isOnline,
+          },
+        });
+      }
+    });
+
+    return () => subscription.remove();
+  }, [router]);
+
   useEffect(() => {
     if (!isInitialized) return;
 
     const inAuthGroup = segments[0] === "(auth)";
+    const inOnboardingGroup = segments[0] === "(onboarding)";
+    const hasNiches = (user?.niches?.length ?? 0) >= 3;
 
-    if (!firebaseUser && !inAuthGroup) {
-      // Redirect to login page if unauthenticated and not already in auth group
-      router.replace("/(auth)");
-    } else if (firebaseUser && inAuthGroup) {
-      // Redirect to main app if authenticated and trying to access auth screens
-      router.replace("/(tabs)/chats");
-    }
-  }, [firebaseUser, isInitialized, segments]);
+    // Defer redirect to the next tick to ensure root navigator finishes mounting
+    const timeout = setTimeout(() => {
+      if (!firebaseUser && !inAuthGroup) {
+        // Not signed in — send to auth screens
+        router.replace("/(auth)");
+      } else if (firebaseUser && inAuthGroup) {
+        // Just signed in / signed up — check if niches are set
+        if (hasNiches) {
+          router.replace("/(tabs)/chats");
+        } else {
+          router.replace("/(onboarding)/niches");
+        }
+      } else if (firebaseUser && inOnboardingGroup && hasNiches) {
+        // Onboarding just completed — niches saved, move to main app
+        router.replace("/(tabs)/chats");
+      }
+    }, 0);
+
+    return () => clearTimeout(timeout);
+  }, [firebaseUser, user, isInitialized, segments]);
 
   if (!isInitialized) {
     return (
@@ -53,6 +102,7 @@ export default function RootLayout() {
       <StatusBar hidden />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(onboarding)" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen
           name="search"

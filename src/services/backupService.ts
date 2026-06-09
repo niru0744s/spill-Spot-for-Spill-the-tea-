@@ -16,9 +16,11 @@
 import {
   writeBatch,
   doc,
+  getDoc,
   serverTimestamp,
   setDoc,
   collection,
+  Timestamp,
 } from 'firebase/firestore';
 import { db, auth } from '@/config/firebase';
 import {
@@ -77,16 +79,17 @@ export async function backupAllChats(
     // Ensure chat document exists in Firestore
     const meta = getChatMeta(chatId);
     if (meta) {
-      await setDoc(
-        doc(db, 'chats', chatId),
-        {
-          participants: [uid, meta.partnerUid],
-          lastMessage: meta.lastMessage,
-          lastMessageAt: serverTimestamp(),
-          createdAt: serverTimestamp(),
-        },
-        { merge: true }
-      );
+      const chatDocRef = doc(db, 'chats', chatId);
+      const docSnap = await getDoc(chatDocRef);
+      const dataToSet: any = {
+        participants:  [uid, meta.partnerUid],
+        lastMessage:   meta.lastMessage,
+        lastMessageAt: meta.lastMessageAt ? Timestamp.fromMillis(meta.lastMessageAt) : serverTimestamp(),
+      };
+      if (!docSnap.exists()) {
+        dataToSet.createdAt = serverTimestamp();
+      }
+      await setDoc(chatDocRef, dataToSet, { merge: true });
     }
 
     // Batch upload messages in chunks of 500

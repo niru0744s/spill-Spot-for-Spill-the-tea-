@@ -23,6 +23,17 @@ export interface AddChatParticipantsVariables {
   now: TimestampString;
 }
 
+export interface AddGroupParticipantData {
+  chatParticipant_insert: ChatParticipant_Key;
+}
+
+export interface AddGroupParticipantVariables {
+  chatId: UUIDString;
+  userId: UUIDString;
+  isAdmin: boolean;
+  now: TimestampString;
+}
+
 export interface ChatParticipant_Key {
   chatId: UUIDString;
   userId: UUIDString;
@@ -45,6 +56,17 @@ export interface CreateChatData {
 }
 
 export interface CreateChatVariables {
+  now: TimestampString;
+}
+
+export interface CreateGroupChatData {
+  chat_insert: Chat_Key;
+}
+
+export interface CreateGroupChatVariables {
+  groupName: string;
+  groupImageUrl?: string | null;
+  groupDescription?: string | null;
   now: TimestampString;
 }
 
@@ -72,6 +94,35 @@ export interface FindExistingChatVariables {
   otherUserId: UUIDString;
 }
 
+export interface GetChatDetailsData {
+  chat?: {
+    id: UUIDString;
+    isGroup: boolean;
+    groupName?: string | null;
+    groupImageUrl?: string | null;
+    groupDescription?: string | null;
+    createdAt: TimestampString;
+    chatParticipants_on_chat: ({
+      user: {
+        id: UUIDString;
+        username: string;
+        name: string;
+        profilePictureUrl?: string | null;
+        bio?: string | null;
+        lastOnlineAt?: TimestampString | null;
+      } & User_Key;
+      joinedAt: TimestampString;
+      unreadCount: number;
+      isAdmin?: boolean | null;
+      status?: string | null;
+    })[];
+  } & Chat_Key;
+}
+
+export interface GetChatDetailsVariables {
+  chatId: UUIDString;
+}
+
 export interface GetChatMessagesData {
   messages: ({
     id: UUIDString;
@@ -91,6 +142,21 @@ export interface GetChatMessagesVariables {
   chatId: UUIDString;
 }
 
+export interface GetDiscoverGroupsData {
+  chats: ({
+    id: UUIDString;
+    groupName?: string | null;
+    groupImageUrl?: string | null;
+    groupDescription?: string | null;
+    createdAt: TimestampString;
+    chatParticipants_on_chat: ({
+      user: {
+        id: UUIDString;
+      } & User_Key;
+    })[];
+  } & Chat_Key)[];
+}
+
 export interface GetMyChatsData {
   chatParticipants: ({
     chat: {
@@ -98,8 +164,13 @@ export interface GetMyChatsData {
       isGroup: boolean;
       lastMessageText?: string | null;
       lastMessageAt?: TimestampString | null;
+      groupName?: string | null;
+      groupImageUrl?: string | null;
+      groupDescription?: string | null;
     } & Chat_Key;
-      unreadCount: number;
+    unreadCount: number;
+    isAdmin?: boolean | null;
+    status?: string | null;
   })[];
 }
 
@@ -121,6 +192,15 @@ export interface GetUserProfileVariables {
 export interface Message_Key {
   id: UUIDString;
   __typename?: 'Message_Key';
+}
+
+export interface RemoveGroupParticipantData {
+  chatParticipant_delete?: ChatParticipant_Key | null;
+}
+
+export interface RemoveGroupParticipantVariables {
+  chatId: UUIDString;
+  userId: UUIDString;
 }
 
 export interface SearchUsersByUsernameData {
@@ -145,7 +225,7 @@ export interface SendMessageData {
 export interface SendMessageVariables {
   chatId: UUIDString;
   senderId: UUIDString;
-  receiverId: UUIDString;
+  receiverId?: UUIDString | null;
   content: string;
   messageType: string;
   now: TimestampString;
@@ -154,6 +234,28 @@ export interface SendMessageVariables {
 export interface Status_Key {
   id: UUIDString;
   __typename?: 'Status_Key';
+}
+
+export interface UpdateGroupMetadataData {
+  chat_update?: Chat_Key | null;
+}
+
+export interface UpdateGroupMetadataVariables {
+  chatId: UUIDString;
+  groupName?: string | null;
+  groupImageUrl?: string | null;
+  groupDescription?: string | null;
+}
+
+export interface UpdateGroupParticipantData {
+  chatParticipant_update?: ChatParticipant_Key | null;
+}
+
+export interface UpdateGroupParticipantVariables {
+  chatId: UUIDString;
+  userId: UUIDString;
+  isAdmin?: boolean | null;
+  status?: string | null;
 }
 
 export interface UpdateLastSeenData {
@@ -169,6 +271,90 @@ export interface User_Key {
   id: UUIDString;
   __typename?: 'User_Key';
 }
+
+interface GetMyChatsRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (): QueryRef<GetMyChatsData, undefined>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect): QueryRef<GetMyChatsData, undefined>;
+  operationName: string;
+}
+export const getMyChatsRef: GetMyChatsRef;
+
+export function getMyChats(options?: ExecuteQueryOptions): QueryPromise<GetMyChatsData, undefined>;
+export function getMyChats(dc: DataConnect, options?: ExecuteQueryOptions): QueryPromise<GetMyChatsData, undefined>;
+
+interface GetChatDetailsRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: GetChatDetailsVariables): QueryRef<GetChatDetailsData, GetChatDetailsVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: GetChatDetailsVariables): QueryRef<GetChatDetailsData, GetChatDetailsVariables>;
+  operationName: string;
+}
+export const getChatDetailsRef: GetChatDetailsRef;
+
+export function getChatDetails(vars: GetChatDetailsVariables, options?: ExecuteQueryOptions): QueryPromise<GetChatDetailsData, GetChatDetailsVariables>;
+export function getChatDetails(dc: DataConnect, vars: GetChatDetailsVariables, options?: ExecuteQueryOptions): QueryPromise<GetChatDetailsData, GetChatDetailsVariables>;
+
+interface GetDiscoverGroupsRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (): QueryRef<GetDiscoverGroupsData, undefined>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect): QueryRef<GetDiscoverGroupsData, undefined>;
+  operationName: string;
+}
+export const getDiscoverGroupsRef: GetDiscoverGroupsRef;
+
+export function getDiscoverGroups(options?: ExecuteQueryOptions): QueryPromise<GetDiscoverGroupsData, undefined>;
+export function getDiscoverGroups(dc: DataConnect, options?: ExecuteQueryOptions): QueryPromise<GetDiscoverGroupsData, undefined>;
+
+interface FindExistingChatRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: FindExistingChatVariables): QueryRef<FindExistingChatData, FindExistingChatVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: FindExistingChatVariables): QueryRef<FindExistingChatData, FindExistingChatVariables>;
+  operationName: string;
+}
+export const findExistingChatRef: FindExistingChatRef;
+
+export function findExistingChat(vars: FindExistingChatVariables, options?: ExecuteQueryOptions): QueryPromise<FindExistingChatData, FindExistingChatVariables>;
+export function findExistingChat(dc: DataConnect, vars: FindExistingChatVariables, options?: ExecuteQueryOptions): QueryPromise<FindExistingChatData, FindExistingChatVariables>;
+
+interface GetChatMessagesRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: GetChatMessagesVariables): QueryRef<GetChatMessagesData, GetChatMessagesVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: GetChatMessagesVariables): QueryRef<GetChatMessagesData, GetChatMessagesVariables>;
+  operationName: string;
+}
+export const getChatMessagesRef: GetChatMessagesRef;
+
+export function getChatMessages(vars: GetChatMessagesVariables, options?: ExecuteQueryOptions): QueryPromise<GetChatMessagesData, GetChatMessagesVariables>;
+export function getChatMessages(dc: DataConnect, vars: GetChatMessagesVariables, options?: ExecuteQueryOptions): QueryPromise<GetChatMessagesData, GetChatMessagesVariables>;
+
+interface GetUserProfileRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: GetUserProfileVariables): QueryRef<GetUserProfileData, GetUserProfileVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: GetUserProfileVariables): QueryRef<GetUserProfileData, GetUserProfileVariables>;
+  operationName: string;
+}
+export const getUserProfileRef: GetUserProfileRef;
+
+export function getUserProfile(vars: GetUserProfileVariables, options?: ExecuteQueryOptions): QueryPromise<GetUserProfileData, GetUserProfileVariables>;
+export function getUserProfile(dc: DataConnect, vars: GetUserProfileVariables, options?: ExecuteQueryOptions): QueryPromise<GetUserProfileData, GetUserProfileVariables>;
+
+interface SearchUsersByUsernameRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: SearchUsersByUsernameVariables): QueryRef<SearchUsersByUsernameData, SearchUsersByUsernameVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: SearchUsersByUsernameVariables): QueryRef<SearchUsersByUsernameData, SearchUsersByUsernameVariables>;
+  operationName: string;
+}
+export const searchUsersByUsernameRef: SearchUsersByUsernameRef;
+
+export function searchUsersByUsername(vars: SearchUsersByUsernameVariables, options?: ExecuteQueryOptions): QueryPromise<SearchUsersByUsernameData, SearchUsersByUsernameVariables>;
+export function searchUsersByUsername(dc: DataConnect, vars: SearchUsersByUsernameVariables, options?: ExecuteQueryOptions): QueryPromise<SearchUsersByUsernameData, SearchUsersByUsernameVariables>;
 
 interface CreateUserRef {
   /* Allow users to create refs without passing in DataConnect */
@@ -218,6 +404,66 @@ export const addChatParticipantsRef: AddChatParticipantsRef;
 export function addChatParticipants(vars: AddChatParticipantsVariables): MutationPromise<AddChatParticipantsData, AddChatParticipantsVariables>;
 export function addChatParticipants(dc: DataConnect, vars: AddChatParticipantsVariables): MutationPromise<AddChatParticipantsData, AddChatParticipantsVariables>;
 
+interface CreateGroupChatRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: CreateGroupChatVariables): MutationRef<CreateGroupChatData, CreateGroupChatVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: CreateGroupChatVariables): MutationRef<CreateGroupChatData, CreateGroupChatVariables>;
+  operationName: string;
+}
+export const createGroupChatRef: CreateGroupChatRef;
+
+export function createGroupChat(vars: CreateGroupChatVariables): MutationPromise<CreateGroupChatData, CreateGroupChatVariables>;
+export function createGroupChat(dc: DataConnect, vars: CreateGroupChatVariables): MutationPromise<CreateGroupChatData, CreateGroupChatVariables>;
+
+interface AddGroupParticipantRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: AddGroupParticipantVariables): MutationRef<AddGroupParticipantData, AddGroupParticipantVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: AddGroupParticipantVariables): MutationRef<AddGroupParticipantData, AddGroupParticipantVariables>;
+  operationName: string;
+}
+export const addGroupParticipantRef: AddGroupParticipantRef;
+
+export function addGroupParticipant(vars: AddGroupParticipantVariables): MutationPromise<AddGroupParticipantData, AddGroupParticipantVariables>;
+export function addGroupParticipant(dc: DataConnect, vars: AddGroupParticipantVariables): MutationPromise<AddGroupParticipantData, AddGroupParticipantVariables>;
+
+interface UpdateGroupParticipantRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: UpdateGroupParticipantVariables): MutationRef<UpdateGroupParticipantData, UpdateGroupParticipantVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: UpdateGroupParticipantVariables): MutationRef<UpdateGroupParticipantData, UpdateGroupParticipantVariables>;
+  operationName: string;
+}
+export const updateGroupParticipantRef: UpdateGroupParticipantRef;
+
+export function updateGroupParticipant(vars: UpdateGroupParticipantVariables): MutationPromise<UpdateGroupParticipantData, UpdateGroupParticipantVariables>;
+export function updateGroupParticipant(dc: DataConnect, vars: UpdateGroupParticipantVariables): MutationPromise<UpdateGroupParticipantData, UpdateGroupParticipantVariables>;
+
+interface RemoveGroupParticipantRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: RemoveGroupParticipantVariables): MutationRef<RemoveGroupParticipantData, RemoveGroupParticipantVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: RemoveGroupParticipantVariables): MutationRef<RemoveGroupParticipantData, RemoveGroupParticipantVariables>;
+  operationName: string;
+}
+export const removeGroupParticipantRef: RemoveGroupParticipantRef;
+
+export function removeGroupParticipant(vars: RemoveGroupParticipantVariables): MutationPromise<RemoveGroupParticipantData, RemoveGroupParticipantVariables>;
+export function removeGroupParticipant(dc: DataConnect, vars: RemoveGroupParticipantVariables): MutationPromise<RemoveGroupParticipantData, RemoveGroupParticipantVariables>;
+
+interface UpdateGroupMetadataRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: UpdateGroupMetadataVariables): MutationRef<UpdateGroupMetadataData, UpdateGroupMetadataVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: UpdateGroupMetadataVariables): MutationRef<UpdateGroupMetadataData, UpdateGroupMetadataVariables>;
+  operationName: string;
+}
+export const updateGroupMetadataRef: UpdateGroupMetadataRef;
+
+export function updateGroupMetadata(vars: UpdateGroupMetadataVariables): MutationPromise<UpdateGroupMetadataData, UpdateGroupMetadataVariables>;
+export function updateGroupMetadata(dc: DataConnect, vars: UpdateGroupMetadataVariables): MutationPromise<UpdateGroupMetadataData, UpdateGroupMetadataVariables>;
+
 interface UpdateLastSeenRef {
   /* Allow users to create refs without passing in DataConnect */
   (vars: UpdateLastSeenVariables): MutationRef<UpdateLastSeenData, UpdateLastSeenVariables>;
@@ -229,64 +475,4 @@ export const updateLastSeenRef: UpdateLastSeenRef;
 
 export function updateLastSeen(vars: UpdateLastSeenVariables): MutationPromise<UpdateLastSeenData, UpdateLastSeenVariables>;
 export function updateLastSeen(dc: DataConnect, vars: UpdateLastSeenVariables): MutationPromise<UpdateLastSeenData, UpdateLastSeenVariables>;
-
-interface GetMyChatsRef {
-  /* Allow users to create refs without passing in DataConnect */
-  (): QueryRef<GetMyChatsData, undefined>;
-  /* Allow users to pass in custom DataConnect instances */
-  (dc: DataConnect): QueryRef<GetMyChatsData, undefined>;
-  operationName: string;
-}
-export const getMyChatsRef: GetMyChatsRef;
-
-export function getMyChats(options?: ExecuteQueryOptions): QueryPromise<GetMyChatsData, undefined>;
-export function getMyChats(dc: DataConnect, options?: ExecuteQueryOptions): QueryPromise<GetMyChatsData, undefined>;
-
-interface FindExistingChatRef {
-  /* Allow users to create refs without passing in DataConnect */
-  (vars: FindExistingChatVariables): QueryRef<FindExistingChatData, FindExistingChatVariables>;
-  /* Allow users to pass in custom DataConnect instances */
-  (dc: DataConnect, vars: FindExistingChatVariables): QueryRef<FindExistingChatData, FindExistingChatVariables>;
-  operationName: string;
-}
-export const findExistingChatRef: FindExistingChatRef;
-
-export function findExistingChat(vars: FindExistingChatVariables, options?: ExecuteQueryOptions): QueryPromise<FindExistingChatData, FindExistingChatVariables>;
-export function findExistingChat(dc: DataConnect, vars: FindExistingChatVariables, options?: ExecuteQueryOptions): QueryPromise<FindExistingChatData, FindExistingChatVariables>;
-
-interface GetChatMessagesRef {
-  /* Allow users to create refs without passing in DataConnect */
-  (vars: GetChatMessagesVariables): QueryRef<GetChatMessagesData, GetChatMessagesVariables>;
-  /* Allow users to pass in custom DataConnect instances */
-  (dc: DataConnect, vars: GetChatMessagesVariables): QueryRef<GetChatMessagesData, GetChatMessagesVariables>;
-  operationName: string;
-}
-export const getChatMessagesRef: GetChatMessagesRef;
-
-export function getChatMessages(vars: GetChatMessagesVariables, options?: ExecuteQueryOptions): QueryPromise<GetChatMessagesData, GetChatMessagesVariables>;
-export function getChatMessages(dc: DataConnect, vars: GetChatMessagesVariables, options?: ExecuteQueryOptions): QueryPromise<GetChatMessagesData, GetChatMessagesVariables>;
-
-interface GetUserProfileRef {
-  /* Allow users to create refs without passing in DataConnect */
-  (vars: GetUserProfileVariables): QueryRef<GetUserProfileData, GetUserProfileVariables>;
-  /* Allow users to pass in custom DataConnect instances */
-  (dc: DataConnect, vars: GetUserProfileVariables): QueryRef<GetUserProfileData, GetUserProfileVariables>;
-  operationName: string;
-}
-export const getUserProfileRef: GetUserProfileRef;
-
-export function getUserProfile(vars: GetUserProfileVariables, options?: ExecuteQueryOptions): QueryPromise<GetUserProfileData, GetUserProfileVariables>;
-export function getUserProfile(dc: DataConnect, vars: GetUserProfileVariables, options?: ExecuteQueryOptions): QueryPromise<GetUserProfileData, GetUserProfileVariables>;
-
-interface SearchUsersByUsernameRef {
-  /* Allow users to create refs without passing in DataConnect */
-  (vars: SearchUsersByUsernameVariables): QueryRef<SearchUsersByUsernameData, SearchUsersByUsernameVariables>;
-  /* Allow users to pass in custom DataConnect instances */
-  (dc: DataConnect, vars: SearchUsersByUsernameVariables): QueryRef<SearchUsersByUsernameData, SearchUsersByUsernameVariables>;
-  operationName: string;
-}
-export const searchUsersByUsernameRef: SearchUsersByUsernameRef;
-
-export function searchUsersByUsername(vars: SearchUsersByUsernameVariables, options?: ExecuteQueryOptions): QueryPromise<SearchUsersByUsernameData, SearchUsersByUsernameVariables>;
-export function searchUsersByUsername(dc: DataConnect, vars: SearchUsersByUsernameVariables, options?: ExecuteQueryOptions): QueryPromise<SearchUsersByUsernameData, SearchUsersByUsernameVariables>;
 

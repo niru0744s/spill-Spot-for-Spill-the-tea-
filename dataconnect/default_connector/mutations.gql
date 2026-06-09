@@ -27,7 +27,7 @@ mutation CreateUser(
 mutation SendMessage(
   $chatId: UUID!,
   $senderId: UUID!,
-  $receiverId: UUID!,
+  $receiverId: UUID,
   $content: String!,
   $messageType: String!,
   $now: Timestamp!
@@ -74,6 +74,83 @@ mutation AddChatParticipants(
     unreadCount: 0,
     joinedAt: $now
   })
+}
+
+# Create a new group chat. Returns the new chat's UUID.
+mutation CreateGroupChat(
+  $groupName: String!,
+  $groupImageUrl: String,
+  $groupDescription: String,
+  $now: Timestamp!
+) @auth(level: USER) {
+  chat_insert(data: {
+    isGroup: true,
+    groupName: $groupName,
+    groupImageUrl: $groupImageUrl,
+    groupDescription: $groupDescription,
+    createdAt: $now
+  })
+}
+
+# Add a participant to a group chat.
+mutation AddGroupParticipant(
+  $chatId: UUID!,
+  $userId: UUID!,
+  $isAdmin: Boolean!,
+  $now: Timestamp!
+) @auth(level: USER) {
+  chatParticipant_insert(data: {
+    chatId: $chatId,
+    userId: $userId,
+    unreadCount: 0,
+    joinedAt: $now,
+    isAdmin: $isAdmin,
+    status: "ACTIVE"
+  })
+}
+
+# Update a group participant's status or role (e.g. promote/demote or remove).
+mutation UpdateGroupParticipant(
+  $chatId: UUID!,
+  $userId: UUID!,
+  $isAdmin: Boolean,
+  $status: String
+) @auth(level: USER) {
+  chatParticipant_update(
+    key: { chatId: $chatId, userId: $userId },
+    data: {
+      isAdmin: $isAdmin,
+      status: $status
+    }
+  )
+}
+
+# Delete a participant record completely (e.g. when a user clears/deletes group history).
+mutation RemoveGroupParticipant(
+  $chatId: UUID!,
+  $userId: UUID!
+) @auth(level: USER) {
+  chatParticipant_delete(key: {
+    chatId: $chatId,
+    userId: $userId
+  })
+}
+
+# Update group chat metadata.
+mutation UpdateGroupMetadata(
+  $chatId: UUID!,
+  $groupName: String,
+  $groupImageUrl: String,
+  $groupDescription: String
+) @auth(level: USER) {
+  chat_update(
+    id: $chatId,
+    data: {
+      groupName: $groupName,
+      groupImageUrl: $groupImageUrl,
+      groupDescription: $groupDescription
+    }
+  )
 }
 
 # ==========================================

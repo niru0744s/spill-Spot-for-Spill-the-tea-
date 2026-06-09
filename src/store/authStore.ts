@@ -30,6 +30,11 @@ export interface UserProfile {
   lastSeen: Timestamp;
   createdAt: Timestamp;
   updatedAt: Timestamp;
+  /**
+   * Interest niches selected during onboarding (3–5 items).
+   * If undefined or empty, the user hasn't completed niche onboarding yet.
+   */
+  niches?: string[];
 }
 
 interface AuthState {

@@ -277,7 +277,7 @@ export default function SignupScreen() {
       ))}
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.kav}
       >
         <ScrollView
@@ -561,11 +561,6 @@ const styles = StyleSheet.create({
   inputRowFocused: {
     borderColor: C.inputFocusBorder,
     backgroundColor: 'rgba(255,255,255,0.07)',
-    shadowColor: '#96f996',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    elevation: 4,
   },
   // Icon styling handled directly via MaterialIcons color prop
   input: {
