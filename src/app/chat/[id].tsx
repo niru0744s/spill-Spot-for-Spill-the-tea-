@@ -24,6 +24,7 @@ import { setActiveChatId } from '@/services/activeChat';
 import type { StoredMessage } from '@/services/chatStorage';
 import { buildChatId, clearDraft, getChatMeta, getDraft, saveChatMeta, saveDraft } from '@/services/chatStorage';
 import { sendMessage as sendMsg } from '@/services/messageService';
+import { getMillis, isUserOnline, getPresenceLabel } from '@/services/presenceService';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
@@ -252,6 +253,11 @@ export default function ChatRoomScreen() {
   const [partnerOnline, setPartnerOnline] = useState(isOnline);
   const [partnerPhotoURL, setPartnerPhotoURL] = useState<string | null>(photoURL);
   const [partnerActiveChatId, setPartnerActiveChatId] = useState<string | null>(null);
+  const [partnerLastSeen, setPartnerLastSeen] = useState<number>(() => {
+    const meta = getChatMeta(chatId);
+    return meta?.partnerLastSeen ?? Date.now();
+  });
+  const [presenceLabel, setPresenceLabel] = useState<string>('Offline');
   const [isLoading, setIsLoading] = useState(true);
 
   // Premium quick-load transition when entering a chat
@@ -273,10 +279,12 @@ export default function ChatRoomScreen() {
         const online = !!data.isOnline;
         const activeChat = data.activeChatId ?? null;
         const livePhoto = data.photoURL && data.photoURL !== 'null' ? data.photoURL : null;
+        const lastSeenMs = data.lastSeen ? getMillis(data.lastSeen) : Date.now();
         
         setPartnerOnline(online);
         setPartnerPhotoURL(livePhoto);
         setPartnerActiveChatId(activeChat);
+        setPartnerLastSeen(lastSeenMs);
 
         // Update local metadata cache reactively
         const existingMeta = getChatMeta(chatId);
@@ -285,6 +293,7 @@ export default function ChatRoomScreen() {
             ...existingMeta,
             partnerOnline: online,
             partnerPhoto: livePhoto,
+            partnerLastSeen: lastSeenMs,
           });
         }
       }
@@ -305,8 +314,9 @@ export default function ChatRoomScreen() {
       lastMessage: existing?.lastMessage ?? '',
       lastMessageAt: existing?.lastMessageAt ?? Date.now(),
       isBackedUp: existing?.isBackedUp ?? false,
+      partnerLastSeen: partnerLastSeen,
     });
-  }, [chatId, partnerPhotoURL, partnerOnline]);
+  }, [chatId, partnerPhotoURL, partnerOnline, partnerLastSeen, currentUid, partnerUid, username]);
 
   const {
     messages,
@@ -318,6 +328,23 @@ export default function ChatRoomScreen() {
     notifyTyping,
     stopTyping,
   } = useRealtimeChat(chatId);
+
+  // Dynamic presence label countdown logic
+  useEffect(() => {
+    const updateLabel = () => {
+      if (isOtherTyping) {
+        setPresenceLabel('typing...');
+      } else {
+        const label = getPresenceLabel(partnerLastSeen, partnerOnline, partnerActiveChatId, chatId);
+        setPresenceLabel(label);
+      }
+    };
+
+    updateLabel();
+
+    const interval = setInterval(updateLabel, 30 * 1000); // refresh time-ago label every 30s
+    return () => clearInterval(interval);
+  }, [isOtherTyping, partnerLastSeen, partnerOnline, partnerActiveChatId, chatId]);
 
   // Tell the global listener and Firestore that this chat is actively open
   useEffect(() => {
@@ -427,18 +454,12 @@ export default function ChatRoomScreen() {
                 <Text style={styles.headerAvatarInitial}>{getInitial(username)}</Text>
               </View>
             )}
-            {partnerOnline && <View style={styles.headerOnlineDot} />}
+            {isUserOnline(partnerLastSeen, partnerOnline) && <View style={styles.headerOnlineDot} />}
           </View>
           <View>
             <Text style={styles.headerName}>{username}</Text>
-            <Text style={[styles.headerStatus, partnerOnline && styles.headerStatusOnline]}>
-              {isOtherTyping
-                ? 'typing...'
-                : partnerOnline
-                ? partnerActiveChatId === chatId
-                  ? 'on chat'
-                  : 'Active now'
-                : 'Offline'}
+            <Text style={[styles.headerStatus, isUserOnline(partnerLastSeen, partnerOnline) && styles.headerStatusOnline]}>
+              {presenceLabel}
             </Text>
           </View>
         </TouchableOpacity>

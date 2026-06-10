@@ -46,6 +46,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSearch } from '@/hooks/useSearch';
 import type { SearchUser } from '@/hooks/useSearch';
+import { isUserOnline, getMillis } from '@/services/presenceService';
 
 const { width, height } = Dimensions.get('window');
 
@@ -202,15 +203,13 @@ function UserCard({ user, index }: { user: SearchUser; index: number }) {
     ]).start();
   }, []);
 
-  // isOnline comes directly from Firestore field
-  const isOnline = user.isOnline;
+  // isOnline is lease-checked based on Firestore fields
+  const isOnline = isUserOnline(user.lastSeen, user.isOnline);
 
   const lastSeenLabel = () => {
     if (!user.lastSeen) return null;
-    // Firestore Timestamp — convert to ms
-    const ms = typeof user.lastSeen === 'object' && 'toMillis' in user.lastSeen
-      ? (user.lastSeen as { toMillis: () => number }).toMillis()
-      : Date.now();
+    // Format timestamp using robust presenceService helper
+    const ms = getMillis(user.lastSeen);
     const diff  = Date.now() - ms;
     const mins  = Math.floor(diff / 60000);
     const hours = Math.floor(diff / 3600000);
@@ -231,10 +230,10 @@ function UserCard({ user, index }: { user: SearchUser; index: number }) {
         id: user.uid,
         username: user.displayName,
         photoURL: user.photoURL ?? 'null',
-        isOnline: String(user.isOnline),
+        isOnline: String(isOnline),
       },
     });
-  }, [user, router]);
+  }, [user, router, isOnline]);
 
   return (
     <Animated.View style={[styles.card, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>

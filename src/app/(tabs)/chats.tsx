@@ -32,6 +32,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useInbox, type InboxItem } from '@/hooks/useInbox';
 import { useAuth } from '@/hooks/useAuth';
 import { clearUnread } from '@/services/chatStorage';
+import { isUserOnline } from '@/services/presenceService';
 
 const { width } = Dimensions.get('window');
 
@@ -190,7 +191,7 @@ function ChatCard({ item, onPress, index }: { item: InboxItem; onPress: () => vo
             </Text>
           )}
           {/* Online dot */}
-          {item.partnerOnline && <View style={styles.onlineDot} />}
+          {isUserOnline(item.partnerLastSeen, item.partnerOnline) && <View style={styles.onlineDot} />}
         </View>
 
         {/* Info */}

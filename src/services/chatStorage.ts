@@ -45,6 +45,7 @@ export interface ChatMeta {
   isBackedUp: boolean;
   isGroup?: boolean;
   status?: string;
+  partnerLastSeen?: number;
 }
 
 // ---------------------------------------------------------------------------
