@@ -166,7 +166,11 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   glow: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: 'rgba(150,249,150,0.04)',
     borderRadius: 20,
   },

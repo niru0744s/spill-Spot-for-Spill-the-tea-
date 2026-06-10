@@ -28,10 +28,16 @@ export interface StoredMessage {
   senderName?: string;
   senderPhoto?: string | null;
   content: string;
-  type: 'TEXT' | 'IMAGE';
+  type: 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE';
   status: MessageStatus;
   createdAt: number;    // Unix ms
   isMine: boolean;      // shortcut: senderUid === currentUser.uid
+
+  // Media properties
+  localUri?: string;
+  fileName?: string;
+  fileSize?: number;
+  mimeType?: string;
 }
 
 export interface ChatMeta {

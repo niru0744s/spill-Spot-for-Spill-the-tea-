@@ -78,7 +78,7 @@ export function InAppBanner() {
   const getInitial = (name: string) => name.charAt(0).toUpperCase();
 
   // Don't render if completely hidden off-screen (saves rendering layout costs)
-  if (!visible && slideAnim._value === -150) {
+  if (!visible && (slideAnim as any)._value === -150) {
     return null;
   }
 

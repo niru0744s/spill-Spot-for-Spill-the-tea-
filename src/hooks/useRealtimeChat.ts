@@ -33,6 +33,7 @@ import {
   processRetryQueue,
   markMessagesAsRead,
   EDIT_DELETE_WINDOW_MS,
+  downloadAndConsumeMediaMessage,
 } from '@/services/messageService';
 import { triggerMediumImpact } from '@/services/hapticService';
 import { getMessages, updateMessageStatus, getChatMeta, saveChatMeta, clearUnread, editMessageLocally, deleteMessageLocally, type StoredMessage } from '@/services/chatStorage';
@@ -144,7 +145,10 @@ export function useRealtimeChat(chatId: string) {
               type: data.type ?? 'TEXT',
               status: data.status ?? 'SENT',
               createdAt: data.createdAt ?? null,
-            },
+              fileName: data.fileName ?? null,
+              fileSize: data.fileSize ?? null,
+              mimeType: data.mimeType ?? null,
+            } as any,
             activeChatId: chatId,
           });
 
@@ -154,6 +158,23 @@ export function useRealtimeChat(chatId: string) {
             triggerMediumImpact();
             return [...prev, incoming];
           });
+
+          // Trigger background download and consumption of transit media
+          if (incoming.type !== 'TEXT') {
+            downloadAndConsumeMediaMessage(chatId, incoming).then(() => {
+              setMessages(prev =>
+                prev.map(m => {
+                  if (m.id === incoming.id) {
+                    const fresh = getMessages(chatId).find(x => x.id === incoming.id);
+                    return fresh ? fresh : m;
+                  }
+                  return m;
+                })
+              );
+            }).catch((err) => {
+              console.error('[useRealtimeChat] downloadAndConsumeMediaMessage error:', err);
+            });
+          }
 
           // Delete the transit message from Firestore immediately after receipt
           deleteDoc(doc(db, 'chats', chatId, 'messages', msgId)).catch(() => {});

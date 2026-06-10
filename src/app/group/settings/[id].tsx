@@ -534,7 +534,6 @@ export default function GroupSettingsScreen() {
                     <TouchableOpacity
                       style={styles.actionIcon}
                       onPress={() => handleToggleAdmin(member.user.id, isMemberAdmin)}
-                      title={isMemberAdmin ? 'Demote' : 'Promote'}
                     >
                       <MaterialIcons
                         name={isMemberAdmin ? 'verified-user' : 'security'}
@@ -801,7 +800,7 @@ const styles = StyleSheet.create({
   },
   saveBtnText: {
     fontSize: 13,
-    fontWeight: '950',
+    fontWeight: '900',
     color: C.background,
   },
   cancelBtn: {
@@ -948,7 +947,7 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: '850',
+    fontWeight: '800',
     color: C.white,
   },
   modalCloseBtn: {

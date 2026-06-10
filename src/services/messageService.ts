@@ -42,6 +42,8 @@ import {
 import { sendPushNotification } from './notificationService';
 import { storage } from './mmkv';
 import { isUserOnline } from './presenceService';
+import * as FileSystem from 'expo-file-system/legacy';
+import { uploadMediaToSupabase, deleteMediaFromSupabase } from './supabaseService';
 export const EDIT_DELETE_WINDOW_MS = 3 * 60 * 60 * 1000; // 3 hours
 
 // ---------------------------------------------------------------------------
@@ -420,6 +422,9 @@ export function handleIncomingMessage({
     type: string;
     status: string;
     createdAt: Timestamp | null;
+    fileName?: string | null;
+    fileSize?: number | null;
+    mimeType?: string | null;
   };
   activeChatId: string | null; // currently open chat (null if on other screen)
 }): StoredMessage {
@@ -432,10 +437,13 @@ export function handleIncomingMessage({
     chatId,
     senderUid: firestoreData.senderUid,
     content: firestoreData.content,
-    type: (firestoreData.type as 'TEXT' | 'IMAGE') ?? 'TEXT',
+    type: (firestoreData.type as any) ?? 'TEXT',
     status: (firestoreData.status as StoredMessage['status']) ?? 'DELIVERED',
     createdAt,
     isMine: firestoreData.senderUid === currentUserUid,
+    fileName: firestoreData.fileName || undefined,
+    fileSize: firestoreData.fileSize || undefined,
+    mimeType: firestoreData.mimeType || undefined,
   };
 
   // Save to MMKV
@@ -447,4 +455,222 @@ export function handleIncomingMessage({
   }
 
   return msg;
+}
+
+export async function sendMediaMessage({
+  chatId,
+  senderUid,
+  localUri,
+  type,
+  fileName,
+  fileSize,
+  mimeType,
+  partnerMeta,
+}: {
+  chatId: string;
+  senderUid: string;
+  localUri: string;
+  type: 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE';
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  partnerMeta?: Partial<ChatMeta>;
+}): Promise<StoredMessage> {
+  const ext = fileName.split('.').pop() || '';
+  const createdAt = Date.now();
+  const id = `${createdAt}_${randomUUID().substring(0, 8)}`;
+  
+  const typeFolder = type.toLowerCase();
+  const destDir = `${FileSystem.documentDirectory}media/${chatId}/${typeFolder}/`;
+  const destUri = `${destDir}${id}.${ext}`;
+
+  // Ensure directory exists and copy file persistently
+  await FileSystem.makeDirectoryAsync(destDir, { intermediates: true });
+  await FileSystem.copyAsync({ from: localUri, to: destUri });
+
+  // Build local message object (content = localUri)
+  const msg: StoredMessage = {
+    id,
+    chatId,
+    senderUid,
+    content: destUri,
+    type,
+    status: 'SENDING',
+    createdAt,
+    isMine: true,
+    localUri: destUri,
+    fileName,
+    fileSize,
+    mimeType,
+  };
+
+  // Write to MMKV
+  appendMessage(msg);
+
+  // Ensure chat metadata exists locally
+  let lastMsgText = 'Media file';
+  if (type === 'IMAGE') lastMsgText = '📷 Image';
+  else if (type === 'VIDEO') lastMsgText = '🎥 Video';
+  else if (type === 'AUDIO') lastMsgText = '🎙️ Voice Message';
+  else if (type === 'FILE') lastMsgText = `📄 ${fileName}`;
+
+  const existing = getChatMeta(chatId);
+  if (!existing && partnerMeta) {
+    saveChatMeta({
+      chatId,
+      partnerUid: partnerMeta.partnerUid ?? '',
+      partnerName: partnerMeta.partnerName ?? '',
+      partnerPhoto: partnerMeta.partnerPhoto ?? null,
+      partnerOnline: partnerMeta.partnerOnline ?? false,
+      lastMessage: lastMsgText,
+      lastMessageAt: createdAt,
+      isBackedUp: false,
+    });
+  }
+
+  // Trigger background upload
+  const partnerUid = partnerMeta?.partnerUid;
+  (async () => {
+    try {
+      const filenameInBucket = `${chatId}/${id}.${ext}`;
+      const publicUrl = await uploadMediaToSupabase(destUri, filenameInBucket, mimeType);
+
+      if (!publicUrl) {
+        throw new Error('Supabase upload returned null URL');
+      }
+
+      // Update local message in MMKV with public url
+      const sentMsg = { ...msg, content: publicUrl, status: 'SENT' as const };
+      appendMessage(sentMsg);
+
+      // Post metadata to Firestore
+      const msgRef = doc(messagesRef(chatId), id);
+      await setDoc(msgRef, {
+        id,
+        senderUid,
+        content: publicUrl,
+        type,
+        status: 'SENT',
+        createdAt: serverTimestamp(),
+        fileName,
+        fileSize,
+        mimeType,
+      });
+
+      // Update chat-level metadata in Firestore
+      await setDoc(
+        chatDocRef(chatId),
+        {
+          lastMessage: lastMsgText,
+          lastMessageAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      // Handle partner inbox update & push notifications
+      let actualPartnerUid = partnerUid;
+      if (!actualPartnerUid) {
+        const meta = getChatMeta(chatId);
+        if (meta) actualPartnerUid = meta.partnerUid;
+      }
+
+      if (actualPartnerUid) {
+        const senderName = auth.currentUser?.displayName ?? 'Someone';
+        const senderPhoto = auth.currentUser?.photoURL ?? null;
+
+        let isPartnerOnline = false;
+        let isPartnerOnChat = false;
+        let pushToken: string | undefined = undefined;
+
+        try {
+          const partnerSnap = await getDoc(doc(db, 'users', actualPartnerUid));
+          if (partnerSnap.exists()) {
+            const partnerData = partnerSnap.data();
+            isPartnerOnChat = partnerData.activeChatId === chatId;
+            isPartnerOnline = isUserOnline(partnerData.lastSeen, !!partnerData.isOnline);
+            pushToken = partnerData.pushToken;
+          }
+        } catch (err) {
+          console.warn('[messageService] Failed to fetch partner profile:', err);
+        }
+
+        const partnerInboxRef = doc(db, 'users', actualPartnerUid, 'inbox', chatId);
+        await setDoc(
+          partnerInboxRef,
+          {
+            chatId,
+            partnerUid: senderUid,
+            partnerName: senderName,
+            partnerPhoto: senderPhoto,
+            lastMessage: lastMsgText,
+            lastMessageAt: serverTimestamp(),
+            unreadCount: isPartnerOnChat ? 0 : increment(1),
+            isGroup: false,
+          },
+          { merge: true }
+        );
+
+        if (!isPartnerOnChat && pushToken) {
+          sendPushNotification({
+            to: pushToken,
+            title: senderName,
+            body: lastMsgText,
+            data: { chatId, senderUid },
+          }).catch(err => console.error('[messageService] Push failed:', err));
+        }
+      }
+    } catch (err) {
+      console.error('[messageService] sendMediaMessage background upload failed:', err);
+      updateMessageStatus(chatId, id, 'FAILED');
+    }
+  })();
+
+  return msg;
+}
+
+export async function downloadAndConsumeMediaMessage(
+  chatId: string,
+  message: StoredMessage
+): Promise<void> {
+  const { id, type, content: mediaUrl, fileName } = message;
+  if (!mediaUrl || !mediaUrl.startsWith('http')) return; // already local or invalid
+
+  const typeFolder = type.toLowerCase();
+  const destDir = `${FileSystem.documentDirectory}media/${chatId}/${typeFolder}/`;
+  const ext = fileName?.split('.').pop() || '';
+  const destUri = `${destDir}${id}.${ext}`;
+
+  try {
+    // Check disk space
+    const freeSpace = await FileSystem.getFreeDiskStorageAsync();
+    const fileSize = message.fileSize || 0;
+    if (freeSpace < fileSize + 10 * 1024 * 1024) {
+      throw new Error('Insufficient disk space');
+    }
+
+    await FileSystem.makeDirectoryAsync(destDir, { intermediates: true });
+
+    // Download natively
+    const result = await FileSystem.downloadAsync(mediaUrl, destUri);
+    if (result.status !== 200) {
+      throw new Error(`Media download failed with status ${result.status}`);
+    }
+
+    // Update MMKV message
+    const downloadedMsg = {
+      ...message,
+      content: destUri,
+      localUri: destUri,
+    };
+    appendMessage(downloadedMsg);
+
+    // Delete temporary file from Supabase
+    const filenameInBucket = `${chatId}/${id}.${ext}`;
+    await deleteMediaFromSupabase(filenameInBucket);
+
+  } catch (error) {
+    console.error(`[messageService] Failed to download media for message ${id}:`, error);
+    throw error;
+  }
 }
