@@ -639,6 +639,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '800',
     color: C.primaryFixedDim,
+    includeFontPadding: false,
   },
   onlineDot: {
     position: 'absolute',
@@ -649,7 +650,7 @@ const styles = StyleSheet.create({
     borderRadius: 7,
     backgroundColor: C.primaryContainer,
     borderWidth: 2,
-    borderColor: C.background,
+    borderColor: '#1b211a',
     shadowColor: C.primaryContainer,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.9,
@@ -664,11 +665,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: C.white,
     letterSpacing: -0.2,
+    includeFontPadding: false,
   },
   cardUsername: {
     fontSize: 13,
     fontWeight: '400',
     color: C.onSurfaceVariant,
+    includeFontPadding: false,
   },
 
   /* Online/last seen badge */
@@ -679,12 +682,14 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     color: 'rgba(190,202,185,0.6)',
     textTransform: 'uppercase',
+    includeFontPadding: false,
   },
   cardBadgeTime: {
     fontSize: 10,
     fontWeight: '700',
     color: C.onSurfaceVariant,
     letterSpacing: 0.3,
+    includeFontPadding: false,
   },
   cardBadgeTimeOnline: {
     color: C.primaryFixedDim,
@@ -697,6 +702,7 @@ const styles = StyleSheet.create({
     color: C.onSurfaceVariant,
     fontStyle: 'italic',
     lineHeight: 20,
+    includeFontPadding: false,
   },
 
   /* CTA */
@@ -723,6 +729,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: C.onPrimaryContainer,
+    includeFontPadding: false,
   },
   ctaBtnTextOffline: {
     color: C.onSurfaceVariant,

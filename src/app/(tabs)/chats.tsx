@@ -591,6 +591,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
+    overflow: 'hidden',
   },
   chatAvatarActive: {
     borderWidth: 2,
@@ -600,6 +601,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '800',
     color: C.primaryFixedDim,
+    includeFontPadding: false,
   },
   chatInfo: {
     flex: 1,
@@ -608,7 +610,7 @@ const styles = StyleSheet.create({
   chatRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'baseline',
+    alignItems: 'center',
     marginBottom: 4,
   },
   chatName: {
@@ -616,6 +618,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: C.onSurface,
     flex: 1,
+    includeFontPadding: false,
   },
   chatNameActive: {
     color: C.white,
@@ -628,6 +631,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
     marginLeft: 8,
     flexShrink: 0,
+    includeFontPadding: false,
   },
   chatTimeActive: {
     color: C.primaryContainer,
@@ -636,10 +640,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '400',
     color: C.onSurfaceVariant,
+    includeFontPadding: false,
   },
   chatAvatarImg: {
-    width: 52,
-    height: 52,
+    width: '100%',
+    height: '100%',
     borderRadius: 26,
   },
   onlineDot: {
@@ -651,7 +656,7 @@ const styles = StyleSheet.create({
     borderRadius: 7,
     backgroundColor: '#96f996',
     borderWidth: 2,
-    borderColor: '#0f150e',
+    borderColor: C.surfaceContainer,
   },
   chatPreviewActive: {
     color: '#dfe4d9',
@@ -671,6 +676,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
     color: '#002105',
+    includeFontPadding: false,
   },
   unreadDot: {
     width: 10,

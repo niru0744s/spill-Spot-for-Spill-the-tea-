@@ -181,6 +181,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexShrink: 0,
     position: 'relative',
+    overflow: 'hidden',
   },
   avatarActive: {
     borderWidth: 2,
@@ -192,14 +193,15 @@ const styles = StyleSheet.create({
     borderColor: '#ffb59c',
   },
   avatarImg: {
-    width: 52,
-    height: 52,
+    width: '100%',
+    height: '100%',
     borderRadius: 26,
   },
   avatarText: {
     fontSize: 20,
     fontWeight: '800',
     color: C.secondary,
+    includeFontPadding: false,
   },
   avatarTextRemoved: {
     color: '#ffb59c',
@@ -231,6 +233,7 @@ const styles = StyleSheet.create({
     color: C.onSurface,
     flex: 1,
     paddingRight: 8,
+    includeFontPadding: false,
   },
   nameActive: {
     color: C.white,
@@ -239,6 +242,7 @@ const styles = StyleSheet.create({
   time: {
     fontSize: 12,
     color: C.onSurfaceVariant,
+    includeFontPadding: false,
   },
   timeActive: {
     color: C.primaryFixedDim,
@@ -249,6 +253,7 @@ const styles = StyleSheet.create({
     color: C.onSurfaceVariant,
     flex: 1,
     paddingRight: 8,
+    includeFontPadding: false,
   },
   previewActive: {
     color: C.onSurface,
@@ -267,6 +272,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '900',
     color: C.background,
+    includeFontPadding: false,
   },
   removedTag: {
     backgroundColor: 'rgba(255,181,156,0.15)',
@@ -279,5 +285,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#ffb59c',
     textTransform: 'uppercase',
+    includeFontPadding: false,
   },
 });
