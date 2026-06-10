@@ -68,29 +68,5 @@ export function getPresenceLabel(
   currentChatId: string | null = null
 ): string {
   const online = isUserOnline(lastSeen, isOnlineField);
-  
-  if (online) {
-    if (activeChatId && currentChatId && activeChatId === currentChatId) {
-      return 'on chat';
-    }
-    return 'Active now';
-  }
-
-  const lastSeenMs = getMillis(lastSeen);
-  if (lastSeenMs === 0) return 'Offline';
-
-  const diffMs = Date.now() - lastSeenMs;
-  const mins = Math.floor(diffMs / 60000);
-  const hours = Math.floor(diffMs / 3600000);
-
-  if (mins < 1) {
-    return 'Active just now';
-  }
-  if (mins < 60) {
-    return `Active ${mins}m ago`;
-  }
-  if (hours < 24) {
-    return `Active ${hours}h ago`;
-  }
-  return 'Offline';
+  return online ? 'Active now' : 'Offline';
 }

@@ -17,18 +17,43 @@ export function usePresence(): void {
   const uid = firebaseUser?.uid;
   
   const lastStatusRef = useRef<boolean | null>(null);
+  const heartbeatTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (!uid) {
       lastStatusRef.current = null;
+      if (heartbeatTimerRef.current) {
+        clearInterval(heartbeatTimerRef.current);
+        heartbeatTimerRef.current = null;
+      }
       return;
     }
 
+    const startHeartbeat = () => {
+      if (heartbeatTimerRef.current) clearInterval(heartbeatTimerRef.current);
+      heartbeatTimerRef.current = setInterval(() => {
+        if (uid && lastStatusRef.current === true) {
+          setUserOnlineStatus(uid, true).catch(() => {});
+        }
+      }, 60000);
+    };
+
+    const stopHeartbeat = () => {
+      if (heartbeatTimerRef.current) {
+        clearInterval(heartbeatTimerRef.current);
+        heartbeatTimerRef.current = null;
+      }
+    };
+
     const updateStatus = (online: boolean) => {
-      // Avoid redundant database writes
       if (lastStatusRef.current === online) return;
       lastStatusRef.current = online;
       setUserOnlineStatus(uid, online);
+      if (online) {
+        startHeartbeat();
+      } else {
+        stopHeartbeat();
+      }
     };
 
     // 1. Initial connect — set user online immediately
@@ -65,6 +90,7 @@ export function usePresence(): void {
     return () => {
       appStateSubscription.remove();
       unsubscribeNetInfo();
+      stopHeartbeat();
       
       // Best-effort cleanup on unmount
       if (uid) {

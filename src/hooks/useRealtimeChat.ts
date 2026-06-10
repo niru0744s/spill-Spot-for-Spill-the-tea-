@@ -35,7 +35,7 @@ import {
   markMessageRead,
   markMessagesAsRead,
 } from '@/services/messageService';
-import { getMessages, updateMessageStatus, getChatMeta, saveChatMeta, type StoredMessage } from '@/services/chatStorage';
+import { getMessages, updateMessageStatus, getChatMeta, saveChatMeta, clearUnread, type StoredMessage } from '@/services/chatStorage';
 
 // ---------------------------------------------------------------------------
 // Hook
@@ -188,6 +188,7 @@ export function useRealtimeChat(chatId: string) {
   // ── 5. Mark all partner messages as READ (call on chat open/focus) ───────
   const markAsRead = useCallback(() => {
     if (!currentUid) return;
+    clearUnread(chatId);
     markMessagesAsRead(chatId, currentUid).catch(() => {});
   }, [chatId, currentUid]);
 

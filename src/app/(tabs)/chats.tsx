@@ -31,7 +31,6 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useInbox, type InboxItem } from '@/hooks/useInbox';
 import { useAuth } from '@/hooks/useAuth';
-import { clearUnread } from '@/services/chatStorage';
 import { isUserOnline } from '@/services/presenceService';
 
 const { width } = Dimensions.get('window');
@@ -281,8 +280,6 @@ export default function ChatsScreen() {
   }, [router]);
 
   const handleOpenChat = useCallback((item: InboxItem) => {
-    // Clear unread count when opening
-    clearUnread(item.chatId);
     refresh();
     router.push({
       pathname: '/chat/[id]',
