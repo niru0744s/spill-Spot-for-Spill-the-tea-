@@ -34,6 +34,7 @@ import {
   markMessagesAsRead,
   EDIT_DELETE_WINDOW_MS,
 } from '@/services/messageService';
+import { triggerMediumImpact } from '@/services/hapticService';
 import { getMessages, updateMessageStatus, getChatMeta, saveChatMeta, clearUnread, editMessageLocally, deleteMessageLocally, type StoredMessage } from '@/services/chatStorage';
 
 // ---------------------------------------------------------------------------
@@ -150,6 +151,7 @@ export function useRealtimeChat(chatId: string) {
           setMessages(prev => {
             const exists = prev.findIndex(m => m.id === incoming.id);
             if (exists !== -1) return prev;
+            triggerMediumImpact();
             return [...prev, incoming];
           });
 

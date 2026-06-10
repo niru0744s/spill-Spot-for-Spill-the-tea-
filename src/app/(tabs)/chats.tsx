@@ -32,6 +32,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useInbox, type InboxItem } from '@/hooks/useInbox';
 import { useAuth } from '@/hooks/useAuth';
 import { isUserOnline } from '@/services/presenceService';
+import { triggerSelection, triggerMediumImpact } from '@/services/hapticService';
 
 const { width } = Dimensions.get('window');
 
@@ -155,7 +156,7 @@ function MyTeaBubble({ displayName, photoURL }: { displayName: string; photoURL:
 }
 
 /* ── Chat card ─────────────────────────────────────────────── */
-function ChatCard({ item, onPress, index }: { item: InboxItem; onPress: () => void; index: number }) {
+const ChatCard = React.memo(function ChatCard({ item, onPress, index }: { item: InboxItem; onPress: () => void; index: number }) {
   const fadeAnim  = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
 
@@ -175,7 +176,10 @@ function ChatCard({ item, onPress, index }: { item: InboxItem; onPress: () => vo
     <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
       <TouchableOpacity
         style={[styles.chatCard, hasUnread && styles.chatCardActive]}
-        onPress={onPress}
+        onPress={() => {
+          triggerSelection();
+          onPress();
+        }}
         activeOpacity={0.75}
       >
         {hasUnread && <View style={styles.chatCardGlow} />}
@@ -219,7 +223,19 @@ function ChatCard({ item, onPress, index }: { item: InboxItem; onPress: () => vo
       </TouchableOpacity>
     </Animated.View>
   );
-}
+}, (prevProps, nextProps) => {
+  return (
+    prevProps.index === nextProps.index &&
+    prevProps.item.chatId === nextProps.item.chatId &&
+    prevProps.item.lastMessage === nextProps.item.lastMessage &&
+    prevProps.item.lastMessageAt === nextProps.item.lastMessageAt &&
+    prevProps.item.partnerName === nextProps.item.partnerName &&
+    prevProps.item.partnerPhoto === nextProps.item.partnerPhoto &&
+    prevProps.item.partnerOnline === nextProps.item.partnerOnline &&
+    prevProps.item.partnerLastSeen === nextProps.item.partnerLastSeen &&
+    prevProps.item.unreadCount === nextProps.item.unreadCount
+  );
+});
 
 /** Format a Unix ms timestamp into a human-readable label */
 function formatTime(ms: number): string {
@@ -276,6 +292,7 @@ export default function ChatsScreen() {
   );
 
   const handleNewChat = useCallback(() => {
+    triggerMediumImpact();
     router.push('/search');
   }, [router]);
 

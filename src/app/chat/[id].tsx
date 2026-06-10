@@ -25,6 +25,7 @@ import type { StoredMessage } from '@/services/chatStorage';
 import { buildChatId, clearDraft, getChatMeta, getDraft, saveChatMeta, saveDraft, editMessageLocally, deleteMessageLocally } from '@/services/chatStorage';
 import { sendMessage as sendMsg, sendEditSignal, sendDeleteSignal, EDIT_DELETE_WINDOW_MS } from '@/services/messageService';
 import { getMillis, isUserOnline, getPresenceLabel } from '@/services/presenceService';
+import { triggerMediumImpact, triggerHeavyImpact, triggerSuccessNotification, triggerSelection } from '@/services/hapticService';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
@@ -33,6 +34,7 @@ import {
   useEffect,
   useRef,
   useState,
+  memo,
 } from 'react';
 import {
   ActivityIndicator,
@@ -129,7 +131,7 @@ function StatusTick({ status }: { status: StoredMessage['status'] }) {
 }
 
 /* ── Message bubble ─────────────────────────────────── */
-function MessageBubble({
+const MessageBubble = memo(function MessageBubble({
   item,
   prevItem,
   onLongPress,
@@ -181,7 +183,15 @@ function MessageBubble({
       )}
     </View>
   );
-}
+}, (prevProps, nextProps) => {
+  return (
+    prevProps.item.id === nextProps.item.id &&
+    prevProps.item.content === nextProps.item.content &&
+    prevProps.item.status === nextProps.item.status &&
+    prevProps.prevItem?.id === nextProps.prevItem?.id &&
+    prevProps.prevItem?.createdAt === nextProps.prevItem?.createdAt
+  );
+});
 
 /* ── Offline banner ─────────────────────────────────── */
 function OfflineBanner() {
@@ -292,6 +302,7 @@ export default function ChatRoomScreen() {
   const [editText, setEditText] = useState('');
 
   const handleMessageLongPress = useCallback((msg: StoredMessage) => {
+    triggerHeavyImpact(); // Heavy pop for message options
     setSelectedMessage(msg);
     setOptionsModalVisible(true);
   }, []);
@@ -299,6 +310,7 @@ export default function ChatRoomScreen() {
   const handleDeleteForMe = useCallback(() => {
     if (!selectedMessage) return;
     const msgId = selectedMessage.id;
+    triggerSuccessNotification(); // Success vibration
     setOptionsModalVisible(false);
     setSelectedMessage(null);
 
@@ -310,6 +322,7 @@ export default function ChatRoomScreen() {
   const handleDeleteForEveryone = useCallback(async () => {
     if (!selectedMessage) return;
     const msgId = selectedMessage.id;
+    triggerSuccessNotification(); // Success vibration
     setOptionsModalVisible(false);
     setSelectedMessage(null);
 
@@ -337,6 +350,7 @@ export default function ChatRoomScreen() {
     const isWithinWindow = Date.now() - selectedMessage.createdAt < EDIT_DELETE_WINDOW_MS;
     if (!isWithinWindow || !selectedMessage.isMine) return;
 
+    triggerSelection(); // Selection haptic
     setEditText(selectedMessage.content);
     setOptionsModalVisible(false);
     setEditModalVisible(true);
@@ -357,6 +371,7 @@ export default function ChatRoomScreen() {
       return;
     }
 
+    triggerSuccessNotification(); // Success vibration
     setEditModalVisible(false);
     setSelectedMessage(null);
     setEditText('');
@@ -433,6 +448,7 @@ export default function ChatRoomScreen() {
     const text = inputText.trim();
     if (!text || !currentUid) return;
 
+    triggerMediumImpact(); // Slightly heavier kick feedback on message send
     setInputText('');
     setInputHeight(44);
     clearDraft(chatId);
@@ -527,6 +543,10 @@ export default function ChatRoomScreen() {
         inverted
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
+        initialNumToRender={20}
+        maxToRenderPerBatch={10}
+        windowSize={11}
+        removeClippedSubviews={Platform.OS === 'android'}
         ListFooterComponent={<DateDivider label="TODAY" />}
         ListHeaderComponent={isOtherTyping ? <TypingIndicator /> : null}
         contentContainerStyle={[

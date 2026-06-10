@@ -27,6 +27,7 @@ import React, {
   useRef,
   useEffect,
   useCallback,
+  memo,
 } from 'react';
 import {
   View,
@@ -47,6 +48,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSearch } from '@/hooks/useSearch';
 import type { SearchUser } from '@/hooks/useSearch';
 import { isUserOnline, getMillis } from '@/services/presenceService';
+import { triggerSelection } from '@/services/hapticService';
 
 const { width, height } = Dimensions.get('window');
 
@@ -181,7 +183,7 @@ function SearchBar({
 }
 
 /* ── User result card ──────────────────────────────────────── */
-function UserCard({ user, index }: { user: SearchUser; index: number }) {
+const UserCard = memo(function UserCard({ user, index }: { user: SearchUser; index: number }) {
   const slideAnim = useRef(new Animated.Value(24)).current;
   const fadeAnim  = useRef(new Animated.Value(0)).current;
 
@@ -222,6 +224,7 @@ function UserCard({ user, index }: { user: SearchUser; index: number }) {
   const router = useRouter();
 
   const handleStartChat = useCallback(() => {
+    triggerSelection(); // Selection haptic
     // Navigate directly to chat screen with the other user's UID.
     // The chat page will handle finding/creating the actual chat session.
     router.push({
@@ -290,7 +293,17 @@ function UserCard({ user, index }: { user: SearchUser; index: number }) {
       </TouchableOpacity>
     </Animated.View>
   );
-}
+}, (prevProps, nextProps) => {
+  return (
+    prevProps.index === nextProps.index &&
+    prevProps.user.uid === nextProps.user.uid &&
+    prevProps.user.name === nextProps.user.name &&
+    prevProps.user.displayName === nextProps.user.displayName &&
+    prevProps.user.photoURL === nextProps.user.photoURL &&
+    prevProps.user.isOnline === nextProps.user.isOnline &&
+    prevProps.user.lastSeen === nextProps.user.lastSeen
+  );
+});
 
 /* ── Main Screen ───────────────────────────────────────────── */
 export default function SearchScreen() {
