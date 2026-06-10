@@ -7,7 +7,6 @@ import {
   Animated,
   Image,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
 
 export interface GroupCardItem {
   id: string;
@@ -154,7 +153,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.05)',
-    gap: 14,
     overflow: 'hidden',
     position: 'relative',
   },
@@ -220,6 +218,7 @@ const styles = StyleSheet.create({
   info: {
     flex: 1,
     minWidth: 0,
+    marginLeft: 14,
   },
   row: {
     flexDirection: 'row',

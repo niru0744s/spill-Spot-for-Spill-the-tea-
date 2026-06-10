@@ -197,7 +197,7 @@ const ChatCard = React.memo(function ChatCard({ item, onPress, index }: { item: 
           {isUserOnline(item.partnerLastSeen, item.partnerOnline) && <View style={styles.onlineDot} />}
         </View>
 
-        {/* Info */}
+        {/* Info Area */}
         <View style={styles.chatInfo}>
           <View style={styles.chatRow}>
             <Text style={[styles.chatName, hasUnread && styles.chatNameActive]} numberOfLines={1}>
@@ -207,19 +207,21 @@ const ChatCard = React.memo(function ChatCard({ item, onPress, index }: { item: 
               {timeLabel}
             </Text>
           </View>
-          <Text style={[styles.chatPreview, hasUnread && styles.chatPreviewActive]} numberOfLines={1}>
-            {item.lastMessage || 'Say hello! 👋'}
-          </Text>
-        </View>
 
-        {/* Unread badge */}
-        {hasUnread && (
-          <View style={styles.unreadBadge}>
-            <Text style={styles.unreadBadgeText}>
-              {item.unreadCount > 99 ? '99+' : String(item.unreadCount)}
+          <View style={styles.chatRow}>
+            <Text style={[styles.chatPreview, hasUnread && styles.chatPreviewActive]} numberOfLines={1}>
+              {item.lastMessage || 'Say hello! 👋'}
             </Text>
+
+            {hasUnread && (
+              <View style={styles.unreadBadge}>
+                <Text style={styles.unreadBadgeText}>
+                  {item.unreadCount > 99 ? '99+' : String(item.unreadCount)}
+                </Text>
+              </View>
+            )}
           </View>
-        )}
+        </View>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -565,7 +567,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.05)',
-    gap: 14,
     overflow: 'hidden',
     position: 'relative',
   },
@@ -592,9 +593,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexShrink: 0,
     overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: 'transparent',
   },
   chatAvatarActive: {
-    borderWidth: 2,
     borderColor: 'rgba(122,220,125,0.4)',
   },
   chatAvatarText: {
@@ -606,6 +608,8 @@ const styles = StyleSheet.create({
   chatInfo: {
     flex: 1,
     minWidth: 0,
+    marginLeft: 14,
+    justifyContent: 'center',
   },
   chatRow: {
     flexDirection: 'row',
@@ -618,6 +622,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: C.onSurface,
     flex: 1,
+    paddingRight: 8,
     includeFontPadding: false,
   },
   chatNameActive: {
@@ -629,8 +634,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: C.onSurfaceVariant,
     letterSpacing: 0.3,
-    marginLeft: 8,
-    flexShrink: 0,
     includeFontPadding: false,
   },
   chatTimeActive: {
@@ -640,6 +643,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '400',
     color: C.onSurfaceVariant,
+    flex: 1,
+    paddingRight: 8,
     includeFontPadding: false,
   },
   chatAvatarImg: {
@@ -663,9 +668,9 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   unreadBadge: {
-    minWidth: 22,
-    height: 22,
-    borderRadius: 11,
+    height: 18,
+    minWidth: 18,
+    borderRadius: 9,
     backgroundColor: '#96f996',
     alignItems: 'center',
     justifyContent: 'center',
@@ -673,8 +678,8 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   unreadBadgeText: {
-    fontSize: 11,
-    fontWeight: '800',
+    fontSize: 10,
+    fontWeight: '900',
     color: '#002105',
     includeFontPadding: false,
   },
