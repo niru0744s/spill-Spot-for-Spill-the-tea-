@@ -28,7 +28,6 @@ import {
   Animated,
   Platform,
   Dimensions,
-  StatusBar,
 } from 'react-native';
 import { useAuth } from '@/hooks/useAuth';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -245,11 +244,10 @@ export default function ProfileScreen() {
   const isWorking = authLoading || isUploadingPhoto;
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <StatusBar barStyle="light-content" backgroundColor={C.background} />
+    <View style={styles.container}>
 
       <ScrollView
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={[styles.scroll, { paddingTop: insets.top }]}
         showsVerticalScrollIndicator={false}
       >
         {/* ── Header ────────────────────────────────────── */}

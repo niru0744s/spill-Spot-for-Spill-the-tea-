@@ -315,10 +315,10 @@ export default function ChatsScreen() {
       {/* ── Orbital background ──────────────────────────────── */}
       <OrbBackground />
 
-      <View style={[styles.safeArea, { paddingTop: insets.top }]}>
+      <View style={styles.safeArea}>
 
         {/* ── Top app bar ───────────────────────────────── */}
-        <View style={styles.appBar}>
+        <View style={[styles.appBar, { paddingTop: insets.top + 12 }]}>
           <TouchableOpacity style={styles.appBarBtn} activeOpacity={0.7}>
             <MaterialIcons name="menu" size={24} color={C.onSurfaceVariant} />
           </TouchableOpacity>

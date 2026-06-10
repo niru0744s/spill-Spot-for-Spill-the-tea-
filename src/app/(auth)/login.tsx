@@ -209,7 +209,6 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="light-content" backgroundColor={C.background} />
 
       {/* ── Vortex spinning background ──────────────────────── */}
       <VortexBackground />

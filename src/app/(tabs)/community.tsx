@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useInbox } from '@/hooks/useInbox';
 import { GroupCard, type GroupCardItem } from '@/components/GroupCard';
@@ -124,6 +124,7 @@ function EmptyState({ onCreateGroup }: { onCreateGroup: () => void }) {
 
 export default function CommunityScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { chats, refresh } = useInbox();
   const [localPreviewTrigger, setLocalPreviewTrigger] = useState(0);
   const isLoading = false;
@@ -195,11 +196,11 @@ export default function CommunityScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <View style={styles.container}>
       <OrbBackground />
 
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
         <Text style={styles.headerTitle}>Community</Text>
         <TouchableOpacity
           style={styles.headerBtn}
@@ -233,7 +234,7 @@ export default function CommunityScreen() {
           showsVerticalScrollIndicator={false}
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 

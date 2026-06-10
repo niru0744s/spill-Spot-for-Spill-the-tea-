@@ -518,10 +518,10 @@ export default function ExploreScreen() {
   );
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={styles.container}>
 
       {/* ── Header ─────────────────────────────────────────────────────── */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + (Platform.OS === 'android' ? 12 : 8) }]}>
         <View style={styles.headerLeft}>
           <Text style={styles.headerTitle}>Explore</Text>
           {hasNiches && (

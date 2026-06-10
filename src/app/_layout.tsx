@@ -96,7 +96,7 @@ export default function RootLayout() {
   if (!isInitialized) {
     return (
       <View style={{ flex: 1, backgroundColor: '#0f150e', justifyContent: 'center', alignItems: 'center' }}>
-        <StatusBar hidden />
+        <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
         <ActivityIndicator size="large" color="#96f996" />
       </View>
     );
@@ -104,7 +104,7 @@ export default function RootLayout() {
 
   return (
     <>
-      <StatusBar hidden />
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(onboarding)" />

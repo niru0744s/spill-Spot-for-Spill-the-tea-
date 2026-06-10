@@ -149,7 +149,6 @@ export default function LandingScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="light-content" backgroundColor={C.background} />
 
       {/* ── Background glow blobs ──────────────────────────── */}
       <Animated.View

@@ -269,7 +269,6 @@ export default function SignupScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="light-content" backgroundColor={C.background} />
 
       {/* ── Liquid drop blobs ──────────────────────────────── */}
       {blobs.map((b, i) => (

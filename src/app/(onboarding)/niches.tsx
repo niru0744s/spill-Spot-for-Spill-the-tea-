@@ -233,7 +233,6 @@ export default function NicheSelectionScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar hidden />
 
       {/* ── Background blobs ─────────────────────────────────────────────── */}
       <View style={styles.blobTopRight} pointerEvents="none" />
