@@ -42,6 +42,7 @@ import {
 import { sendPushNotification } from './notificationService';
 import { storage } from './mmkv';
 import { isUserOnline } from './presenceService';
+export const EDIT_DELETE_WINDOW_MS = 3 * 60 * 60 * 1000; // 3 hours
 
 // ---------------------------------------------------------------------------
 // Push token MMKV cache  (avoids one Firestore read per outgoing message)
@@ -95,8 +96,8 @@ export async function sendMessage({
   type?: 'TEXT' | 'IMAGE';
   partnerMeta?: Partial<ChatMeta>;
 }): Promise<StoredMessage> {
-  const id = randomUUID();
   const createdAt = Date.now();
+  const id = `${createdAt}_${randomUUID().substring(0, 8)}`;
 
   // 1️⃣ Build the message object
   const msg: StoredMessage = {
@@ -319,6 +320,68 @@ export async function markMessagesAsRead(
     });
   } catch {
     // Non-critical
+  }
+}
+
+export async function sendEditSignal(
+  chatId: string,
+  messageId: string,
+  newContent: string,
+  partnerUid: string
+): Promise<void> {
+  try {
+    const signalId = randomUUID();
+    const msgRef = doc(db, 'chats', chatId, 'messages', signalId);
+
+    // Write edit signal to Firestore
+    await setDoc(msgRef, {
+      id: signalId,
+      senderUid: auth.currentUser?.uid ?? '',
+      type: 'EDIT_SIGNAL',
+      targetMessageId: messageId,
+      content: newContent,
+      createdAt: serverTimestamp(),
+    });
+
+    // Also write to partner's inbox doc so their background listener wakes up
+    const inboxRef = doc(db, 'users', partnerUid, 'inbox', chatId);
+    await setDoc(inboxRef, {
+      chatId,
+      lastMessage: 'Edited a message',
+      lastMessageAt: serverTimestamp(),
+    }, { merge: true });
+  } catch (err) {
+    console.warn('[messageService] Failed to send edit signal to Firestore:', err);
+  }
+}
+
+export async function sendDeleteSignal(
+  chatId: string,
+  messageId: string,
+  partnerUid: string
+): Promise<void> {
+  try {
+    const signalId = randomUUID();
+    const msgRef = doc(db, 'chats', chatId, 'messages', signalId);
+
+    // Write delete signal to Firestore
+    await setDoc(msgRef, {
+      id: signalId,
+      senderUid: auth.currentUser?.uid ?? '',
+      type: 'DELETE_SIGNAL',
+      targetMessageId: messageId,
+      createdAt: serverTimestamp(),
+    });
+
+    // Also write to partner's inbox doc so their background listener wakes up
+    const inboxRef = doc(db, 'users', partnerUid, 'inbox', chatId);
+    await setDoc(inboxRef, {
+      chatId,
+      lastMessage: 'Deleted a message',
+      lastMessageAt: serverTimestamp(),
+    }, { merge: true });
+  } catch (err) {
+    console.warn('[messageService] Failed to send delete signal to Firestore:', err);
   }
 }
 

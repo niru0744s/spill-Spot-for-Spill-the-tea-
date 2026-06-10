@@ -31,11 +31,10 @@ import { db, auth } from '@/config/firebase';
 import {
   handleIncomingMessage,
   processRetryQueue,
-  markMessageDelivered,
-  markMessageRead,
   markMessagesAsRead,
+  EDIT_DELETE_WINDOW_MS,
 } from '@/services/messageService';
-import { getMessages, updateMessageStatus, getChatMeta, saveChatMeta, clearUnread, type StoredMessage } from '@/services/chatStorage';
+import { getMessages, updateMessageStatus, getChatMeta, saveChatMeta, clearUnread, editMessageLocally, deleteMessageLocally, type StoredMessage } from '@/services/chatStorage';
 
 // ---------------------------------------------------------------------------
 // Hook
@@ -104,6 +103,35 @@ export function useRealtimeChat(chatId: string) {
             return;
           }
 
+          // Handle Control Signals
+          if (data.type === 'DELETE_SIGNAL') {
+            const localMsgs = getMessages(chatId);
+            const target = localMsgs.find(m => m.id === data.targetMessageId);
+            const isWithinWindow = target && (Date.now() - target.createdAt < EDIT_DELETE_WINDOW_MS + 60 * 60 * 1000); // 3 hrs + 1 hr skew buffer
+            
+            if (isWithinWindow) {
+              deleteMessageLocally(chatId, data.targetMessageId);
+              setMessages(prev => prev.filter(m => m.id !== data.targetMessageId));
+            }
+            deleteDoc(doc(db, 'chats', chatId, 'messages', msgId)).catch(() => {});
+            return;
+          }
+
+          if (data.type === 'EDIT_SIGNAL') {
+            const localMsgs = getMessages(chatId);
+            const target = localMsgs.find(m => m.id === data.targetMessageId);
+            const isWithinWindow = target && (Date.now() - target.createdAt < EDIT_DELETE_WINDOW_MS + 60 * 60 * 1000); // 3 hrs + 1 hr skew buffer
+
+            if (isWithinWindow) {
+              editMessageLocally(chatId, data.targetMessageId, data.content);
+              setMessages(prev =>
+                prev.map(m => m.id === data.targetMessageId ? { ...m, content: data.content } : m)
+              );
+            }
+            deleteDoc(doc(db, 'chats', chatId, 'messages', msgId)).catch(() => {});
+            return;
+          }
+
           // Incoming message from partner
           const incoming = handleIncomingMessage({
             chatId,
@@ -125,8 +153,8 @@ export function useRealtimeChat(chatId: string) {
             return [...prev, incoming];
           });
 
-          // Auto-mark as READ since we are already inside the active chat screen
-          markMessageRead(chatId, msgId);
+          // Delete the transit message from Firestore immediately after receipt
+          deleteDoc(doc(db, 'chats', chatId, 'messages', msgId)).catch(() => {});
         }
 
         // ── MODIFIED: status changed (SENT→DELIVERED→READ) ─────────────────
@@ -219,12 +247,24 @@ export function useRealtimeChat(chatId: string) {
     };
   }, [stopTyping]);
 
+  const editLocalMessageState = useCallback((messageId: string, content: string) => {
+    setMessages(prev =>
+      prev.map(m => m.id === messageId ? { ...m, content } : m)
+    );
+  }, []);
+
+  const deleteLocalMessageState = useCallback((messageId: string) => {
+    setMessages(prev => prev.filter(m => m.id !== messageId));
+  }, []);
+
   return {
     messages,
     isOtherTyping,
     isOnline,
     appendLocalMessage,
     updateLocalStatus,
+    editLocalMessageState,
+    deleteLocalMessageState,
     markAsRead,
     notifyTyping,
     stopTyping,

@@ -22,8 +22,8 @@ import { auth, db } from '@/config/firebase';
 import { useRealtimeChat } from '@/hooks/useRealtimeChat';
 import { setActiveChatId } from '@/services/activeChat';
 import type { StoredMessage } from '@/services/chatStorage';
-import { buildChatId, clearDraft, getChatMeta, getDraft, saveChatMeta, saveDraft } from '@/services/chatStorage';
-import { sendMessage as sendMsg } from '@/services/messageService';
+import { buildChatId, clearDraft, getChatMeta, getDraft, saveChatMeta, saveDraft, editMessageLocally, deleteMessageLocally } from '@/services/chatStorage';
+import { sendMessage as sendMsg, sendEditSignal, sendDeleteSignal, EDIT_DELETE_WINDOW_MS } from '@/services/messageService';
 import { getMillis, isUserOnline, getPresenceLabel } from '@/services/presenceService';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -37,7 +37,6 @@ import {
 import {
   ActivityIndicator,
   Animated,
-  Dimensions,
   Easing,
   FlatList,
   Image,
@@ -48,10 +47,9 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-const { width } = Dimensions.get('window');
 
 /* ── Design tokens ─────────────────────────────────── */
 const C = {
@@ -134,9 +132,11 @@ function StatusTick({ status }: { status: StoredMessage['status'] }) {
 function MessageBubble({
   item,
   prevItem,
+  onLongPress,
 }: {
   item: StoredMessage;
   prevItem?: StoredMessage;
+  onLongPress?: () => void;
 }) {
   const isGrouped = prevItem &&
     prevItem.isMine === item.isMine &&
@@ -153,15 +153,20 @@ function MessageBubble({
       item.isMine ? styles.bubbleRowOut : styles.bubbleRowIn,
       isGrouped ? styles.bubbleGrouped : styles.bubbleFirst,
     ]}>
-      <View style={[
-        styles.bubble,
-        item.isMine ? styles.bubbleOut : styles.bubbleIn,
-        item.isMine ? styles.bubbleOutCorner : styles.bubbleInCorner,
-      ]}>
+      <TouchableOpacity
+        activeOpacity={0.85}
+        onLongPress={onLongPress}
+        delayLongPress={400}
+        style={[
+          styles.bubble,
+          item.isMine ? styles.bubbleOut : styles.bubbleIn,
+          item.isMine ? styles.bubbleOutCorner : styles.bubbleInCorner,
+        ]}
+      >
         <Text style={[styles.bubbleText, item.isMine ? styles.bubbleTextOut : styles.bubbleTextIn]}>
           {item.content}
         </Text>
-      </View>
+      </TouchableOpacity>
 
       {/* Outgoing: time + tick */}
       {item.isMine && (
@@ -188,47 +193,7 @@ function OfflineBanner() {
   );
 }
 
-/* ── Premium Skeleton Loader ────────────────────────── */
-function ChatSkeleton() {
-  const shimmerAnim = useRef(new Animated.Value(0.3)).current;
 
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(shimmerAnim, {
-          toValue: 0.7,
-          duration: 800,
-          useNativeDriver: true,
-        }),
-        Animated.timing(shimmerAnim, {
-          toValue: 0.3,
-          duration: 800,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-  }, []);
-
-  return (
-    <View style={styles.skeletonContainer}>
-      <Animated.View style={[styles.skeletonRow, styles.skeletonRowIn, { opacity: shimmerAnim }]}>
-        <View style={[styles.skeletonBubble, styles.skeletonBubbleIn, { width: 120 }]} />
-      </Animated.View>
-
-      <Animated.View style={[styles.skeletonRow, styles.skeletonRowOut, { opacity: shimmerAnim }]}>
-        <View style={[styles.skeletonBubble, styles.skeletonBubbleOut, { width: 180 }]} />
-      </Animated.View>
-
-      <Animated.View style={[styles.skeletonRow, styles.skeletonRowIn, { opacity: shimmerAnim }]}>
-        <View style={[styles.skeletonBubble, styles.skeletonBubbleIn, { width: 90 }]} />
-      </Animated.View>
-
-      <Animated.View style={[styles.skeletonRow, styles.skeletonRowOut, { opacity: shimmerAnim }]}>
-        <View style={[styles.skeletonBubble, styles.skeletonBubbleOut, { width: 140 }]} />
-      </Animated.View>
-    </View>
-  );
-}
 
 /* ── Main Screen ────────────────────────────────────── */
 export default function ChatRoomScreen() {
@@ -258,16 +223,6 @@ export default function ChatRoomScreen() {
     return meta?.partnerLastSeen ?? Date.now();
   });
   const [presenceLabel, setPresenceLabel] = useState<string>('Offline');
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Premium quick-load transition when entering a chat
-  useEffect(() => {
-    setIsLoading(true);
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 600);
-    return () => clearTimeout(timer);
-  }, [chatId]);
 
   // Sync partner online status & photoURL in real-time & update local chat metadata cache
   useEffect(() => {
@@ -323,11 +278,96 @@ export default function ChatRoomScreen() {
     isOtherTyping,
     isOnline: networkOnline,
     appendLocalMessage,
-    updateLocalStatus,
+    editLocalMessageState,
+    deleteLocalMessageState,
     markAsRead,
     notifyTyping,
     stopTyping,
   } = useRealtimeChat(chatId);
+
+  // State for message options and editing
+  const [selectedMessage, setSelectedMessage] = useState<StoredMessage | null>(null);
+  const [optionsModalVisible, setOptionsModalVisible] = useState(false);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editText, setEditText] = useState('');
+
+  const handleMessageLongPress = useCallback((msg: StoredMessage) => {
+    setSelectedMessage(msg);
+    setOptionsModalVisible(true);
+  }, []);
+
+  const handleDeleteForMe = useCallback(() => {
+    if (!selectedMessage) return;
+    const msgId = selectedMessage.id;
+    setOptionsModalVisible(false);
+    setSelectedMessage(null);
+
+    // Delete locally only
+    deleteMessageLocally(chatId, msgId);
+    deleteLocalMessageState(msgId);
+  }, [selectedMessage, chatId, deleteLocalMessageState]);
+
+  const handleDeleteForEveryone = useCallback(async () => {
+    if (!selectedMessage) return;
+    const msgId = selectedMessage.id;
+    setOptionsModalVisible(false);
+    setSelectedMessage(null);
+
+    // Safety check: verify within window
+    const isWithinWindow = Date.now() - selectedMessage.createdAt < EDIT_DELETE_WINDOW_MS;
+    if (!isWithinWindow || !selectedMessage.isMine) {
+      // Fallback: just delete for me
+      deleteMessageLocally(chatId, msgId);
+      deleteLocalMessageState(msgId);
+      return;
+    }
+
+    // 1. Delete locally from MMKV
+    deleteMessageLocally(chatId, msgId);
+    // 2. Update local state
+    deleteLocalMessageState(msgId);
+    // 3. Send delete signal to partner
+    await sendDeleteSignal(chatId, msgId, partnerUid);
+  }, [selectedMessage, chatId, partnerUid, deleteLocalMessageState]);
+
+  const handleStartEdit = useCallback(() => {
+    if (!selectedMessage) return;
+    
+    // Safety check: verify within window
+    const isWithinWindow = Date.now() - selectedMessage.createdAt < EDIT_DELETE_WINDOW_MS;
+    if (!isWithinWindow || !selectedMessage.isMine) return;
+
+    setEditText(selectedMessage.content);
+    setOptionsModalVisible(false);
+    setEditModalVisible(true);
+  }, [selectedMessage]);
+
+  const handleSaveEdit = useCallback(async () => {
+    if (!selectedMessage) return;
+    const msgId = selectedMessage.id;
+    const newText = editText.trim();
+    if (!newText) return;
+
+    // Safety check: verify within window
+    const isWithinWindow = Date.now() - selectedMessage.createdAt < EDIT_DELETE_WINDOW_MS;
+    if (!isWithinWindow || !selectedMessage.isMine) {
+      setEditModalVisible(false);
+      setSelectedMessage(null);
+      setEditText('');
+      return;
+    }
+
+    setEditModalVisible(false);
+    setSelectedMessage(null);
+    setEditText('');
+
+    // 1. Edit locally in MMKV
+    editMessageLocally(chatId, msgId, newText);
+    // 2. Update local state
+    editLocalMessageState(msgId, newText);
+    // 3. Send edit signal to partner
+    await sendEditSignal(chatId, msgId, newText, partnerUid);
+  }, [selectedMessage, editText, chatId, partnerUid, editLocalMessageState]);
 
   // Dynamic presence label countdown logic
   useEffect(() => {
@@ -362,7 +402,7 @@ export default function ChatRoomScreen() {
   }, [chatId, currentUid]);
 
   // Mark partner messages as READ whenever this screen is active
-  useEffect(() => { markAsRead(); }, [chatId]);
+  useEffect(() => { markAsRead(); }, [chatId, markAsRead]);
   useFocusEffect(useCallback(() => { markAsRead(); }, [markAsRead]));
 
   const [inputText, setInputText]     = useState(() => getDraft(chatId));
@@ -422,7 +462,13 @@ export default function ChatRoomScreen() {
   const renderItem = ({ item, index }: { item: StoredMessage; index: number }) => {
     // In a reversed array, the chronological "previous" message is at index + 1
     const prevItem = index < reversedMessages.length - 1 ? reversedMessages[index + 1] : undefined;
-    return <MessageBubble item={item} prevItem={prevItem} />;
+    return (
+      <MessageBubble
+        item={item}
+        prevItem={prevItem}
+        onLongPress={() => handleMessageLongPress(item)}
+      />
+    );
   };
 
   return (
@@ -475,24 +521,20 @@ export default function ChatRoomScreen() {
       </View>
 
       {/* ── Messages ─────────────────────────────────── */}
-      {/* {isLoading ? (
-        <ChatSkeleton />
-      ) : ( */}
-        <FlatList
-          ref={flatListRef}
-          data={reversedMessages}
-          inverted
-          keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          ListFooterComponent={<DateDivider label="TODAY" />}
-          ListHeaderComponent={isOtherTyping ? <TypingIndicator /> : null}
-          contentContainerStyle={[
-            styles.messageList,
-            { paddingVertical: 16 },
-          ]}
-          showsVerticalScrollIndicator={false}
-        />
-      {/* )} */}
+      <FlatList
+        ref={flatListRef}
+        data={reversedMessages}
+        inverted
+        keyExtractor={(item) => item.id}
+        renderItem={renderItem}
+        ListFooterComponent={<DateDivider label="TODAY" />}
+        ListHeaderComponent={isOtherTyping ? <TypingIndicator /> : null}
+        contentContainerStyle={[
+          styles.messageList,
+          { paddingVertical: 16 },
+        ]}
+        showsVerticalScrollIndicator={false}
+      />
 
       {/* ── Input bar ────────────────────────────────── */}
       <View style={[styles.inputBar, { paddingBottom: insets.bottom + 10 }]}>
@@ -531,6 +573,131 @@ export default function ChatRoomScreen() {
             />
           </TouchableOpacity>
       </View>
+
+      {/* ── Message Options Modal (Bottom Sheet style) ── */}
+      <Modal
+        visible={optionsModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setOptionsModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setOptionsModalVisible(false)}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeaderLine} />
+            <Text style={styles.modalTitle}>Message Options</Text>
+            
+            {selectedMessage?.isMine && (Date.now() - selectedMessage.createdAt < EDIT_DELETE_WINDOW_MS) && (
+              <TouchableOpacity
+                style={styles.modalOption}
+                onPress={handleStartEdit}
+                activeOpacity={0.7}
+              >
+                <MaterialIcons name="edit" size={20} color={C.onSurface} />
+                <Text style={styles.modalOptionText}>Edit Message</Text>
+              </TouchableOpacity>
+            )}
+
+            {selectedMessage?.isMine && (Date.now() - selectedMessage.createdAt < EDIT_DELETE_WINDOW_MS) && (
+              <TouchableOpacity
+                style={styles.modalOption}
+                onPress={handleDeleteForEveryone}
+                activeOpacity={0.7}
+              >
+                <MaterialIcons name="delete-sweep" size={20} color={C.errorColor} />
+                <Text style={[styles.modalOptionText, { color: C.errorColor }]}>
+                  Delete for Everyone
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              style={styles.modalOption}
+              onPress={handleDeleteForMe}
+              activeOpacity={0.7}
+            >
+              <MaterialIcons name="delete" size={20} color={C.errorColor} />
+              <Text style={[styles.modalOptionText, { color: C.errorColor }]}>
+                Delete for Me
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.modalOption, styles.modalCancelOption]}
+              onPress={() => setOptionsModalVisible(false)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.modalCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* ── Edit Message Modal ── */}
+      <Modal
+        visible={editModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setEditModalVisible(false);
+          setSelectedMessage(null);
+        }}
+      >
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => {
+              setEditModalVisible(false);
+              setSelectedMessage(null);
+            }}
+          >
+            <View style={[styles.modalContent, styles.editModalContent]} onStartShouldSetResponder={() => true}>
+              <Text style={styles.modalTitle}>Edit Message</Text>
+              
+              <View style={styles.editInputPill}>
+                <TextInput
+                  style={styles.editTextInput}
+                  value={editText}
+                  onChangeText={setEditText}
+                  multiline
+                  autoFocus
+                  placeholder="Edit your message..."
+                  placeholderTextColor="rgba(190,202,185,0.45)"
+                />
+              </View>
+
+              <View style={styles.editActionsRow}>
+                <TouchableOpacity
+                  style={[styles.editBtn, styles.editCancelBtn]}
+                  onPress={() => {
+                    setEditModalVisible(false);
+                    setSelectedMessage(null);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.editCancelBtnText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.editBtn, styles.editSaveBtn, !editText.trim() && styles.editSaveBtnDisabled]}
+                  onPress={handleSaveEdit}
+                  disabled={!editText.trim()}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.editSaveBtnText}>Save</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
+      </Modal>
 
     </KeyboardAvoidingView>
   );
@@ -635,5 +802,117 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 4,
     borderWidth: 1,
     borderColor: 'rgba(150, 249, 150, 0.25)',
+  },
+
+  // Modal styling
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15,21,14,0.75)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: C.surfaceContainerHigh,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+    paddingTop: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
+  modalHeaderLine: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: C.outlineVariant,
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: C.onSurface,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  modalOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+    gap: 12,
+  },
+  modalOptionText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: C.onSurface,
+  },
+  modalCancelOption: {
+    borderBottomWidth: 0,
+    justifyContent: 'center',
+    marginTop: 8,
+  },
+  modalCancelText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: C.onSurfaceVariant,
+  },
+  editModalContent: {
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    borderRadius: 24,
+    marginHorizontal: 16,
+    marginBottom: 'auto',
+    marginTop: 'auto',
+    justifyContent: 'center',
+  },
+  editInputPill: {
+    backgroundColor: C.surfaceContainerHighest,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: C.outlineVariant,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    minHeight: 60,
+    maxHeight: 120,
+    marginBottom: 16,
+  },
+  editTextInput: {
+    fontSize: 16,
+    fontWeight: '400',
+    color: C.onSurface,
+    textAlignVertical: 'top',
+  },
+  editActionsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'flex-end',
+  },
+  editBtn: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  editCancelBtn: {
+    backgroundColor: 'transparent',
+  },
+  editCancelBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: C.onSurfaceVariant,
+  },
+  editSaveBtn: {
+    backgroundColor: C.primaryContainer,
+  },
+  editSaveBtnDisabled: {
+    opacity: 0.5,
+  },
+  editSaveBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: C.onPrimaryContainer,
   },
 });

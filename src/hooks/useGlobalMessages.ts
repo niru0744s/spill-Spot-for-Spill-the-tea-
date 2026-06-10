@@ -20,24 +20,26 @@ import {
   query,
   orderBy,
   onSnapshot,
-  getDocs,
-  limit,
   Timestamp,
+  doc,
+  deleteDoc,
   type Unsubscribe,
 } from 'firebase/firestore';
-import { db, auth } from '@/config/firebase';
+import { db } from '@/config/firebase';
 import {
   saveChatMeta,
   appendMessage,
   incrementUnread,
   getMessages,
   getChatMeta,
+  deleteMessageLocally,
+  editMessageLocally,
   type StoredMessage,
 } from '@/services/chatStorage';
 import { router } from 'expo-router';
 import { useBannerStore } from '@/store/bannerStore';
 import { getActiveChatId } from '@/services/activeChat';
-import { markMessageDelivered } from '@/services/messageService';
+import { EDIT_DELETE_WINDOW_MS } from '@/services/messageService';
 
 import { useAuth } from '@/hooks/useAuth';
 
@@ -130,8 +132,33 @@ function attachChatListener(
       const data  = change.doc.data();
       const msgId = change.doc.id;
 
-      // Skip own messages
+      // Skip own messages/signals
       if (data.senderUid === currentUid) return;
+
+      // Handle Control Signals
+      if (data.type === 'DELETE_SIGNAL') {
+        const localMsgs = getMessages(chatId);
+        const target = localMsgs.find(m => m.id === data.targetMessageId);
+        const isWithinWindow = target && (Date.now() - target.createdAt < EDIT_DELETE_WINDOW_MS + 60 * 60 * 1000); // 3 hrs + 1 hr skew buffer
+
+        if (isWithinWindow) {
+          deleteMessageLocally(chatId, data.targetMessageId);
+        }
+        deleteDoc(doc(db, 'chats', chatId, 'messages', msgId)).catch(() => {});
+        return;
+      }
+
+      if (data.type === 'EDIT_SIGNAL') {
+        const localMsgs = getMessages(chatId);
+        const target = localMsgs.find(m => m.id === data.targetMessageId);
+        const isWithinWindow = target && (Date.now() - target.createdAt < EDIT_DELETE_WINDOW_MS + 60 * 60 * 1000); // 3 hrs + 1 hr skew buffer
+
+        if (isWithinWindow) {
+          editMessageLocally(chatId, data.targetMessageId, data.content);
+        }
+        deleteDoc(doc(db, 'chats', chatId, 'messages', msgId)).catch(() => {});
+        return;
+      }
 
       const createdAt = data.createdAt instanceof Timestamp
         ? data.createdAt.toMillis()
@@ -151,10 +178,17 @@ function attachChatListener(
       // Check if we already have this message in MMKV
       const existing = getMessages(chatId);
       const alreadySaved = existing.some(m => m.id === msgId);
-      if (alreadySaved) return;
+      if (alreadySaved) {
+        // Clean up document from Firestore if already processed
+        deleteDoc(doc(db, 'chats', chatId, 'messages', msgId)).catch(() => {});
+        return;
+      }
 
-      // Save to MMKV
+      // Save to MMKV synchronously first (critical to prevent crash loss)
       appendMessage(msg);
+
+      // Immediately delete transit message document from Firestore
+      deleteDoc(doc(db, 'chats', chatId, 'messages', msgId)).catch(() => {});
 
       // Increment unread and trigger In-App Banner only if user is NOT currently in this chat
       if (getActiveChatId() !== chatId) {
@@ -183,9 +217,6 @@ function attachChatListener(
           }
         );
       }
-
-      // Auto-mark DELIVERED (tells sender their message arrived)
-      markMessageDelivered(chatId, msgId);
     });
   });
 

@@ -52,7 +52,6 @@ export interface ChatMeta {
 // Helpers
 // ---------------------------------------------------------------------------
 
-const MAX_LOCAL_MESSAGES = 200;
 
 function msgsKey(chatId: string)     { return `msgs_${chatId}`; }
 function draftKey(chatId: string)    { return `draft_${chatId}`; }
@@ -131,7 +130,7 @@ export function getMessages(chatId: string): StoredMessage[] {
   return readJSON<StoredMessage[]>(msgsKey(chatId), []);
 }
 
-/** Append a new message. Caps at MAX_LOCAL_MESSAGES (drops oldest). */
+/** Append a new message without capping. */
 export function appendMessage(msg: StoredMessage): void {
   const messages = getMessages(msg.chatId);
 
@@ -144,12 +143,7 @@ export function appendMessage(msg: StoredMessage): void {
     messages.push(msg);
   }
 
-  // Cap to last MAX_LOCAL_MESSAGES
-  const capped = messages.length > MAX_LOCAL_MESSAGES
-    ? messages.slice(messages.length - MAX_LOCAL_MESSAGES)
-    : messages;
-
-  writeJSON(msgsKey(msg.chatId), capped);
+  writeJSON(msgsKey(msg.chatId), messages);
 
   // Update chat meta preview
   const meta = getChatMeta(msg.chatId);
@@ -158,6 +152,47 @@ export function appendMessage(msg: StoredMessage): void {
       ...meta,
       lastMessage: msg.content,
       lastMessageAt: msg.createdAt,
+      isBackedUp: false,
+    });
+  }
+}
+
+/** Edit a message locally in MMKV */
+export function editMessageLocally(chatId: string, messageId: string, newContent: string): void {
+  const messages = getMessages(chatId);
+  const idx = messages.findIndex(m => m.id === messageId);
+  if (idx !== -1) {
+    messages[idx].content = newContent;
+    writeJSON(msgsKey(chatId), messages);
+
+    // Update chat meta preview if this was the last message
+    if (idx === messages.length - 1) {
+      const meta = getChatMeta(chatId);
+      if (meta) {
+        saveChatMeta({
+          ...meta,
+          lastMessage: newContent,
+          isBackedUp: false,
+        });
+      }
+    }
+  }
+}
+
+/** Delete a message locally in MMKV */
+export function deleteMessageLocally(chatId: string, messageId: string): void {
+  const messages = getMessages(chatId);
+  const filtered = messages.filter(m => m.id !== messageId);
+  writeJSON(msgsKey(chatId), filtered);
+
+  // Update chat meta preview if we deleted the last message
+  const meta = getChatMeta(chatId);
+  if (meta) {
+    const lastMsg = filtered[filtered.length - 1];
+    saveChatMeta({
+      ...meta,
+      lastMessage: lastMsg ? lastMsg.content : '',
+      lastMessageAt: lastMsg ? lastMsg.createdAt : Date.now(),
       isBackedUp: false,
     });
   }
