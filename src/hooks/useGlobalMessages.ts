@@ -31,8 +31,11 @@ import {
   appendMessage,
   incrementUnread,
   getMessages,
+  getChatMeta,
   type StoredMessage,
 } from '@/services/chatStorage';
+import { router } from 'expo-router';
+import { useBannerStore } from '@/store/bannerStore';
 import { getActiveChatId } from '@/services/activeChat';
 import { markMessageDelivered } from '@/services/messageService';
 
@@ -153,9 +156,32 @@ function attachChatListener(
       // Save to MMKV
       appendMessage(msg);
 
-      // Increment unread only if user is NOT currently in this chat
+      // Increment unread and trigger In-App Banner only if user is NOT currently in this chat
       if (getActiveChatId() !== chatId) {
         incrementUnread(chatId);
+
+        // Retrieve partner info from local chat metadata cache
+        const meta = getChatMeta(chatId);
+        const partnerName = meta?.partnerName ?? 'Tea Friend';
+        const partnerPhoto = meta?.partnerPhoto ?? null;
+
+        // Trigger sliding In-App Banner alert overlay
+        useBannerStore.getState().showBanner(
+          partnerName,
+          msg.content,
+          partnerPhoto,
+          () => {
+            router.push({
+              pathname: '/chat/[id]',
+              params: {
+                id: msg.senderUid,
+                username: partnerName,
+                photoURL: partnerPhoto ?? 'null',
+                isOnline: 'true',
+              },
+            });
+          }
+        );
       }
 
       // Auto-mark DELIVERED (tells sender their message arrived)

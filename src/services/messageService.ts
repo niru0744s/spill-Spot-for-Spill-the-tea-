@@ -41,6 +41,7 @@ import {
 } from './chatStorage';
 import { sendPushNotification } from './notificationService';
 import { storage } from './mmkv';
+import { isUserOnline } from './presenceService';
 
 // ---------------------------------------------------------------------------
 // Push token MMKV cache  (avoids one Firestore read per outgoing message)
@@ -178,6 +179,22 @@ async function uploadToFirestore(chatId: string, msg: StoredMessage, partnerUid?
   if (actualPartnerUid) {
     const senderName  = auth.currentUser?.displayName ?? 'Someone';
     const senderPhoto = auth.currentUser?.photoURL ?? null;
+
+    let isPartnerOnline = false;
+    let isPartnerOnChat = false;
+    let pushToken: string | undefined = undefined;
+
+    try {
+      const partnerSnap = await getDoc(doc(db, 'users', actualPartnerUid));
+      if (partnerSnap.exists()) {
+        const partnerData = partnerSnap.data();
+        isPartnerOnChat = partnerData.activeChatId === chatId;
+        isPartnerOnline = isUserOnline(partnerData.lastSeen, !!partnerData.isOnline);
+        pushToken = partnerData.pushToken;
+      }
+    } catch (err) {
+      console.warn('[messageService] Failed to fetch partner profile for presence/push check:', err);
+    }
     
     // 1. Write to partner's inbox doc
     const inboxRef = doc(db, 'users', actualPartnerUid, 'inbox', chatId);
@@ -188,7 +205,8 @@ async function uploadToFirestore(chatId: string, msg: StoredMessage, partnerUid?
       partnerPhoto:  senderPhoto,
       lastMessage:   msg.content,
       lastMessageAt: serverTimestamp(),
-      unread:        increment(1),
+      // Only increment unread if they are NOT inside the active chat screen
+      unread:        isPartnerOnChat ? 0 : increment(1),
     }, { merge: true });
 
     // 2. Also write to own inbox doc so our own Firestore preview is kept up to date
@@ -204,26 +222,20 @@ async function uploadToFirestore(chatId: string, msg: StoredMessage, partnerUid?
       unread:        0, // We sent the message, so unread remains 0
     }, { merge: true });
 
-    // Send Push Notification if receiver has registered a token
+    // Send Push Notification if receiver has registered a token and is NOT online or on chat
     try {
-      // 1. Check MMKV cache before hitting Firestore
-      let pushToken = getCachedPushToken(actualPartnerUid);
-
-      if (!pushToken) {
-        // 2. Cache miss — fetch from Firestore then cache the result
-        const partnerSnap = await getDoc(doc(db, 'users', actualPartnerUid));
-        if (partnerSnap.exists()) {
-          const tokenFromStore = partnerSnap.data()?.pushToken as string | undefined;
-          if (tokenFromStore) {
-            pushToken = tokenFromStore;
-            cachePushToken(actualPartnerUid, tokenFromStore);
-          }
-        }
+      // Sync local cache token if we fetched a fresh one
+      if (pushToken) {
+        cachePushToken(actualPartnerUid, pushToken);
+      } else {
+        // Fallback to cache check if getDoc failed
+        pushToken = getCachedPushToken(actualPartnerUid) ?? undefined;
       }
 
-      if (pushToken) {
+      const shouldPush = pushToken && !isPartnerOnline && !isPartnerOnChat;
+      if (shouldPush) {
         await sendPushNotification({
-          to: pushToken,
+          to: pushToken!,
           title: senderName,
           body: msg.content,
           data: {
@@ -231,7 +243,7 @@ async function uploadToFirestore(chatId: string, msg: StoredMessage, partnerUid?
             senderUid:     msg.senderUid,
             senderName:    senderName,
             partnerPhoto:  senderPhoto ?? 'null',
-            partnerOnline: 'true',
+            partnerOnline: 'false',
           },
         });
       }
