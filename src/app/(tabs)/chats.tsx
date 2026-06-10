@@ -28,7 +28,7 @@ import {
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useInbox, type InboxItem } from '@/hooks/useInbox';
 import { useAuth } from '@/hooks/useAuth';
 import { isUserOnline } from '@/services/presenceService';
@@ -315,10 +315,10 @@ export default function ChatsScreen() {
       {/* ── Orbital background ──────────────────────────────── */}
       <OrbBackground />
 
-      <SafeAreaView style={styles.safeArea}>
+      <View style={[styles.safeArea, { paddingTop: insets.top }]}>
 
         {/* ── Top app bar ───────────────────────────────── */}
-        <View style={[styles.appBar, { paddingTop: insets.top + 8 }]}>
+        <View style={styles.appBar}>
           <TouchableOpacity style={styles.appBarBtn} activeOpacity={0.7}>
             <MaterialIcons name="menu" size={24} color={C.onSurfaceVariant} />
           </TouchableOpacity>
@@ -376,7 +376,7 @@ export default function ChatsScreen() {
           <MaterialIcons name="edit-note" size={28} color={C.onPrimaryContainer} />
         </TouchableOpacity>
 
-      </SafeAreaView>
+      </View>
     </View>
   );
 }
