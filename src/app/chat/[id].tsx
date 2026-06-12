@@ -22,8 +22,8 @@ import { auth, db } from '@/config/firebase';
 import { useRealtimeChat } from '@/hooks/useRealtimeChat';
 import { setActiveChatId } from '@/services/activeChat';
 import type { StoredMessage } from '@/services/chatStorage';
-import { buildChatId, clearDraft, getChatMeta, getDraft, saveChatMeta, saveDraft, editMessageLocally, deleteMessageLocally } from '@/services/chatStorage';
-import { sendMessage as sendMsg, sendEditSignal, sendDeleteSignal, EDIT_DELETE_WINDOW_MS, sendMediaMessage } from '@/services/messageService';
+import { buildChatId, clearDraft, getChatMeta, getDraft, saveChatMeta, saveDraft, editMessageLocally, deleteMessageLocally, markMessageAsDeletedLocally } from '@/services/chatStorage';
+import { sendMessage as sendMsg, sendEditSignal, sendDeleteSignal, EDIT_DELETE_WINDOW_MS, sendMediaMessage, deleteLocalMediaFile } from '@/services/messageService';
 import { getMillis, isUserOnline, getPresenceLabel } from '@/services/presenceService';
 import { triggerMediumImpact, triggerHeavyImpact, triggerSuccessNotification, triggerSelection } from '@/services/hapticService';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -55,9 +55,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image as ExpoImage } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system/legacy';
+import { File } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import { Audio } from 'expo-av';
+import {
+  useAudioPlayer,
+  useAudioPlayerStatus,
+  useAudioRecorder,
+  RecordingPresets,
+  requestRecordingPermissionsAsync,
+  setAudioModeAsync,
+} from 'expo-audio';
 import { useVideoPlayer, VideoView } from 'expo-video';
 
 /* ── Design tokens ─────────────────────────────────── */
@@ -76,6 +83,22 @@ const C = {
   outlineVariant:          '#3f4a3d',
   errorColor:              '#ff6b6b',
   white:                   '#ffffff',
+};
+
+const getMessageTime = (msg: StoredMessage | null | undefined): number => {
+  if (!msg) return Date.now();
+  const t = msg.createdAt;
+  if (typeof t === 'number') return t;
+  if (typeof t === 'string') return new Date(t).getTime();
+  if (t && typeof t === 'object') {
+    if ('toMillis' in t && typeof (t as any).toMillis === 'function') {
+      return (t as any).toMillis();
+    }
+    if ('seconds' in t) {
+      return (t as any).seconds * 1000;
+    }
+  }
+  return Date.now();
 };
 
 /* ── Typing indicator dots ─────────────────────────── */
@@ -138,88 +161,67 @@ function StatusTick({ status }: { status: StoredMessage['status'] }) {
 }
 
 /* ── Audio player component inside bubble ────────────── */
-const AudioPlayerBubble = memo(function AudioPlayerBubble({
+const AudioPlayerBubbleInner = memo(function AudioPlayerBubbleInner({
   localUri,
   isMine,
   status,
 }: {
-  localUri?: string;
+  localUri: string;
   isMine: boolean;
   status: string;
 }) {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [sound, setSound] = useState<Audio.Sound | null>(null);
-  const [duration, setDuration] = useState<number | null>(null);
-  const [position, setPosition] = useState(0);
+  const audioSource = Platform.OS === 'android' && localUri.startsWith('file://')
+    ? localUri.replace('file://', '')
+    : localUri;
+
+  const [fileSizeLabel, setFileSizeLabel] = useState<string>('...');
 
   useEffect(() => {
-    if (!localUri) return;
-    
-    let isMounted = true;
-    const loadSound = async () => {
-      try {
-        const { sound: newSound } = await Audio.Sound.createAsync(
-          { uri: localUri },
-          { shouldPlay: false },
-          (status) => {
-            if (status.isLoaded && isMounted) {
-              setPosition(status.positionMillis || 0);
-              if (status.durationMillis) setDuration(status.durationMillis);
-              if (status.didJustFinish) {
-                setIsPlaying(false);
-                newSound.setPositionAsync(0);
-              }
-            }
-          }
-        );
-        if (isMounted) setSound(newSound);
-      } catch (err) {
-        console.warn('[AudioPlayerBubble] Error loading sound:', err);
+    if (Platform.OS === 'web') {
+      setFileSizeLabel('Web');
+      return;
+    }
+    try {
+      const file = new File(localUri);
+      if (!file.exists) {
+        setFileSizeLabel('Missing');
+      } else {
+        setFileSizeLabel(`${(file.size / 1024).toFixed(1)}KB`);
       }
-    };
-
-    loadSound();
-
-    return () => {
-      isMounted = false;
-      if (sound) {
-        sound.unloadAsync();
-      }
-    };
+    } catch {
+      setFileSizeLabel('Err');
+    }
   }, [localUri]);
 
+  const player = useAudioPlayer(audioSource);
+  const playerStatus = useAudioPlayerStatus(player);
+
+  const isPlaying = playerStatus.playing;
+  const duration = playerStatus.duration; // in seconds
+  const currentTime = playerStatus.currentTime; // in seconds
+
   const handlePlayPause = async () => {
-    if (!sound) return;
     try {
       if (isPlaying) {
-        await sound.pauseAsync();
-        setIsPlaying(false);
+        player.pause();
       } else {
-        await sound.playAsync();
-        setIsPlaying(true);
+        if (duration && currentTime >= duration) {
+          await player.seekTo(0);
+        }
+        player.play();
       }
     } catch (err) {
       console.error('[AudioPlayerBubble] Playback error:', err);
     }
   };
 
-  const formatAudioTime = (millis: number) => {
-    const totalSecs = Math.floor(millis / 1000);
-    const mins = Math.floor(totalSecs / 60);
-    const secs = totalSecs % 60;
+  const formatAudioTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
-  if (!localUri) {
-    return (
-      <View style={styles.audioBubble}>
-        <ActivityIndicator size="small" color={C.onSurfaceVariant} />
-        <Text style={styles.mediaPlaceholderText}>Loading audio...</Text>
-      </View>
-    );
-  }
-
-  const progressPct = duration ? (position / duration) * 100 : 0;
+  const progressPct = duration ? (currentTime / duration) * 100 : 0;
 
   return (
     <View style={styles.audioBubble}>
@@ -231,11 +233,32 @@ const AudioPlayerBubble = memo(function AudioPlayerBubble({
           <View style={[styles.audioProgressBar, { width: `${progressPct}%` }]} />
         </View>
         <Text style={styles.audioTimeText}>
-          {formatAudioTime(position)} / {duration ? formatAudioTime(duration) : '0:00'}
+          {formatAudioTime(currentTime)} / {duration ? formatAudioTime(duration) : '0:00'} ({fileSizeLabel})
         </Text>
       </View>
     </View>
   );
+});
+
+const AudioPlayerBubble = memo(function AudioPlayerBubble({
+  localUri,
+  isMine,
+  status,
+}: {
+  localUri?: string;
+  isMine: boolean;
+  status: string;
+}) {
+  if (!localUri) {
+    return (
+      <View style={styles.audioBubble}>
+        <ActivityIndicator size="small" color={C.onSurfaceVariant} />
+        <Text style={styles.mediaPlaceholderText}>Loading audio...</Text>
+      </View>
+    );
+  }
+
+  return <AudioPlayerBubbleInner localUri={localUri} isMine={isMine} status={status} />;
 });
 
 /* ── Message bubble ─────────────────────────────────── */
@@ -265,24 +288,35 @@ const MessageBubble = memo(function MessageBubble({
     minute: '2-digit',
   });
 
+  const handleMediaPress = () => {
+    if (item.type === 'IMAGE' && item.localUri) {
+      setLightboxUri(item.localUri);
+      setLightboxVisible(true);
+    } else if (item.type === 'VIDEO' && item.localUri) {
+      setVideoPlayerUri(item.localUri);
+      setVideoModalVisible(true);
+    } else if (item.type === 'FILE' && item.localUri) {
+      Sharing.shareAsync(item.localUri).catch(err => console.error('[MessageBubble] Share failed:', err));
+    }
+  };
+
   const renderBubbleContent = () => {
     const isMine = item.isMine;
 
-    const handleMediaPress = () => {
-      if (item.type === 'IMAGE' && item.localUri) {
-        setLightboxUri(item.localUri);
-        setLightboxVisible(true);
-      } else if (item.type === 'VIDEO' && item.localUri) {
-        setVideoPlayerUri(item.localUri);
-        setVideoModalVisible(true);
-      } else if (item.type === 'FILE' && item.localUri) {
-        Sharing.shareAsync(item.localUri).catch(err => console.error('[MessageBubble] Share failed:', err));
-      }
-    };
+    if (item.type === 'DELETED') {
+      return (
+        <View style={styles.deletedBubble}>
+          <MaterialIcons name="block" size={16} color={C.onSurfaceVariant} style={{ marginRight: 6 }} />
+          <Text style={styles.deletedText}>
+            {item.isMine ? 'You deleted this message' : 'This message was deleted'}
+          </Text>
+        </View>
+      );
+    }
 
     if (item.type === 'IMAGE') {
       return (
-        <TouchableOpacity activeOpacity={0.9} onPress={handleMediaPress} style={styles.imageBubbleWrap}>
+        <View style={styles.imageBubbleWrap}>
           {item.localUri ? (
             <ExpoImage source={{ uri: item.localUri }} style={styles.imageBubble} contentFit="cover" />
           ) : (
@@ -296,13 +330,13 @@ const MessageBubble = memo(function MessageBubble({
               <ActivityIndicator size="small" color={C.white} />
             </View>
           )}
-        </TouchableOpacity>
+        </View>
       );
     }
 
     if (item.type === 'VIDEO') {
       return (
-        <TouchableOpacity activeOpacity={0.9} onPress={handleMediaPress} style={styles.videoBubbleWrap}>
+        <View style={styles.videoBubbleWrap}>
           {item.localUri ? (
             <View style={{ position: 'relative', width: '100%', height: '100%' }}>
               <View style={styles.videoThumbnailPlaceholder}>
@@ -324,7 +358,7 @@ const MessageBubble = memo(function MessageBubble({
               <ActivityIndicator size="small" color={C.white} />
             </View>
           )}
-        </TouchableOpacity>
+        </View>
       );
     }
 
@@ -337,7 +371,7 @@ const MessageBubble = memo(function MessageBubble({
     if (item.type === 'FILE') {
       const sizeMB = item.fileSize ? (item.fileSize / (1024 * 1024)).toFixed(1) : '?';
       return (
-        <TouchableOpacity activeOpacity={0.8} onPress={handleMediaPress} style={styles.fileBubble}>
+        <View style={styles.fileBubble}>
           <View style={styles.fileIconBg}>
             <MaterialIcons name="insert-drive-file" size={20} color={C.onPrimaryFixed} />
           </View>
@@ -356,7 +390,7 @@ const MessageBubble = memo(function MessageBubble({
           ) : (
             <MaterialIcons name="open-in-new" size={16} color={isMine ? C.onPrimaryFixed : C.onSurfaceVariant} style={{ marginLeft: 8 }} />
           )}
-        </TouchableOpacity>
+        </View>
       );
     }
 
@@ -377,11 +411,16 @@ const MessageBubble = memo(function MessageBubble({
     ]}>
       <TouchableOpacity
         activeOpacity={0.85}
+        onPress={isMedia && item.type !== 'DELETED' ? handleMediaPress : undefined}
         onLongPress={onLongPress}
         delayLongPress={400}
         style={[
           styles.bubble,
-          isMedia ? { padding: 4 } : (item.isMine ? styles.bubbleOut : styles.bubbleIn),
+          item.type === 'DELETED'
+            ? { backgroundColor: 'rgba(255, 255, 255, 0.04)', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.05)', paddingHorizontal: 12, paddingVertical: 8 }
+            : isMedia
+              ? { padding: 4 }
+              : (item.isMine ? styles.bubbleOut : styles.bubbleIn),
           item.isMine ? styles.bubbleOutCorner : styles.bubbleInCorner,
         ]}
       >
@@ -392,7 +431,7 @@ const MessageBubble = memo(function MessageBubble({
       {item.isMine && (
         <View style={styles.metaRow}>
           <Text style={styles.metaTime}>{timeLabel}</Text>
-          <StatusTick status={item.status} />
+          {item.type !== 'DELETED' && <StatusTick status={item.status} />}
         </View>
       )}
       {/* Incoming: time only on last in group */}
@@ -460,7 +499,8 @@ export default function ChatRoomScreen() {
     isOnline: string;
   }>();
 
-  const partnerUid  = params.id;
+  const rawId = params.id as string;
+  const partnerUid = rawId && rawId.includes('?') ? rawId.split('?')[0] : rawId;
   const username    = params.username ?? 'Tea Friend';
   const photoURL    = params.photoURL && params.photoURL !== 'null' ? params.photoURL : null;
   const isOnline    = params.isOnline === 'true';
@@ -534,6 +574,7 @@ export default function ChatRoomScreen() {
     appendLocalMessage,
     editLocalMessageState,
     deleteLocalMessageState,
+    markLocalMessageAsDeletedState,
     markAsRead,
     notifyTyping,
     stopTyping,
@@ -552,7 +593,7 @@ export default function ChatRoomScreen() {
   const [videoPlayerUri, setVideoPlayerUri] = useState<string | null>(null);
 
   // Audio Recording States
-  const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const recordingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -593,9 +634,23 @@ export default function ChatRoomScreen() {
       const fileName = asset.fileName || `${Date.now()}.${type === 'VIDEO' ? 'mp4' : 'jpg'}`;
       const mimeType = type === 'VIDEO' ? 'video/mp4' : 'image/jpeg';
 
-      const fileInfo = await FileSystem.getInfoAsync(localUri);
-      if (!fileInfo.exists) return;
-      const fileSize = fileInfo.size;
+      let fileSize = 0;
+      if (Platform.OS === 'web') {
+        fileSize = asset.fileSize || (asset as any).size || 0;
+        if (!fileSize) {
+          try {
+            const res = await fetch(localUri);
+            const blob = await res.blob();
+            fileSize = blob.size;
+          } catch (e) {
+            console.warn('Failed to fetch media size on web:', e);
+          }
+        }
+      } else {
+        const file = new File(localUri);
+        if (!file.exists) return;
+        fileSize = file.size;
+      }
 
       if (fileSize > 30 * 1024 * 1024) {
         alert('File size exceeds the 30MB limit.');
@@ -647,9 +702,23 @@ export default function ChatRoomScreen() {
       const fileName = asset.fileName || `${Date.now()}.${type === 'VIDEO' ? 'mp4' : 'jpg'}`;
       const mimeType = type === 'VIDEO' ? 'video/mp4' : 'image/jpeg';
 
-      const fileInfo = await FileSystem.getInfoAsync(localUri);
-      if (!fileInfo.exists) return;
-      const fileSize = fileInfo.size;
+      let fileSize = 0;
+      if (Platform.OS === 'web') {
+        fileSize = asset.fileSize || (asset as any).size || 0;
+        if (!fileSize) {
+          try {
+            const res = await fetch(localUri);
+            const blob = await res.blob();
+            fileSize = blob.size;
+          } catch (e) {
+            console.warn('Failed to fetch camera capture size on web:', e);
+          }
+        }
+      } else {
+        const file = new File(localUri);
+        if (!file.exists) return;
+        fileSize = file.size;
+      }
 
       if (fileSize > 30 * 1024 * 1024) {
         alert('File size exceeds the 30MB limit.');
@@ -726,22 +795,20 @@ export default function ChatRoomScreen() {
   const startRecording = async () => {
     setAttachmentModalVisible(false);
     try {
-      const permissionResult = await Audio.requestPermissionsAsync();
+      const permissionResult = await requestRecordingPermissionsAsync();
       if (!permissionResult.granted) {
         alert('Permission to access microphone is required!');
         return;
       }
 
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
+      await setAudioModeAsync({
+        allowsRecording: true,
+        playsInSilentMode: true,
       });
 
-      const { recording: newRecording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY
-      );
+      await audioRecorder.prepareToRecordAsync();
+      audioRecorder.record();
 
-      setRecording(newRecording);
       setIsRecording(true);
       setRecordingDuration(0);
       triggerSelection();
@@ -756,29 +823,44 @@ export default function ChatRoomScreen() {
   };
 
   const stopRecordingAndSend = async () => {
-    if (!recording) return;
-
     setIsRecording(false);
-    setRecording(null);
     if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
     triggerSelection();
 
     try {
-      await recording.stopAndUnloadAsync();
-      const uri = recording.getURI();
+      await audioRecorder.stop();
+      const uri = audioRecorder.uri;
       if (!uri) return;
 
-      const fileInfo = await FileSystem.getInfoAsync(uri);
-      if (!fileInfo.exists) return;
-      const fileSize = fileInfo.size;
+      let fileSize = 0;
+      let fileName = `voice_${Date.now()}.m4a`;
+      let mimeType = 'audio/x-m4a';
+
+      if (Platform.OS === 'web') {
+        const res = await fetch(uri);
+        const blob = await res.blob();
+        fileSize = blob.size;
+        mimeType = blob.type || 'audio/webm';
+        
+        let ext = 'webm';
+        if (mimeType.includes('mp4') || mimeType.includes('m4a') || mimeType.includes('aac')) {
+          ext = 'm4a';
+        } else if (mimeType.includes('ogg')) {
+          ext = 'ogg';
+        } else if (mimeType.includes('wav')) {
+          ext = 'wav';
+        }
+        fileName = `voice_${Date.now()}.${ext}`;
+      } else {
+        const file = new File(uri);
+        if (!file.exists) return;
+        fileSize = file.size;
+      }
 
       if (fileSize > 30 * 1024 * 1024) {
         alert('Recording size exceeds 30MB.');
         return;
       }
-
-      const fileName = `voice_${Date.now()}.m4a`;
-      const mimeType = 'audio/x-m4a';
 
       const msg = await sendMediaMessage({
         chatId,
@@ -803,13 +885,11 @@ export default function ChatRoomScreen() {
   };
 
   const cancelRecording = async () => {
-    if (!recording) return;
     setIsRecording(false);
-    setRecording(null);
     if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
     triggerSelection();
     try {
-      await recording.stopAndUnloadAsync();
+      await audioRecorder.stop();
     } catch {}
   };
 
@@ -822,44 +902,70 @@ export default function ChatRoomScreen() {
   const handleDeleteForMe = useCallback(() => {
     if (!selectedMessage) return;
     const msgId = selectedMessage.id;
+    const msgType = selectedMessage.type;
+    const localUri = selectedMessage.localUri;
+    
     triggerSuccessNotification(); // Success vibration
     setOptionsModalVisible(false);
     setSelectedMessage(null);
 
-    // Delete locally only
-    deleteMessageLocally(chatId, msgId);
-    deleteLocalMessageState(msgId);
-  }, [selectedMessage, chatId, deleteLocalMessageState]);
+    if (msgType === 'DELETED') {
+      // Permanently remove already deleted message
+      deleteMessageLocally(chatId, msgId);
+      deleteLocalMessageState(msgId);
+    } else {
+      // 1. Mark as deleted locally in MMKV
+      markMessageAsDeletedLocally(chatId, msgId);
+      // 2. Mark as deleted in local state
+      markLocalMessageAsDeletedState(msgId);
+      // 3. Clean up local media files
+      if (msgType !== 'TEXT') {
+        deleteLocalMediaFile({ id: msgId, type: msgType, localUri } as any).catch(() => {});
+      }
+    }
+  }, [selectedMessage, chatId, deleteLocalMessageState, markLocalMessageAsDeletedState]);
 
   const handleDeleteForEveryone = useCallback(async () => {
     if (!selectedMessage) return;
     const msgId = selectedMessage.id;
     triggerSuccessNotification(); // Success vibration
     setOptionsModalVisible(false);
-    setSelectedMessage(null);
 
     // Safety check: verify within window
-    const isWithinWindow = Date.now() - selectedMessage.createdAt < EDIT_DELETE_WINDOW_MS;
+    const isWithinWindow = Date.now() - getMessageTime(selectedMessage) < EDIT_DELETE_WINDOW_MS;
     if (!isWithinWindow || !selectedMessage.isMine) {
-      // Fallback: just delete for me
-      deleteMessageLocally(chatId, msgId);
-      deleteLocalMessageState(msgId);
+      // Fallback: just delete for me (by marking as deleted)
+      markMessageAsDeletedLocally(chatId, msgId);
+      markLocalMessageAsDeletedState(msgId);
+      if (selectedMessage.type !== 'TEXT') {
+        deleteLocalMediaFile(selectedMessage).catch(() => {});
+      }
+      setSelectedMessage(null);
       return;
     }
 
-    // 1. Delete locally from MMKV
-    deleteMessageLocally(chatId, msgId);
-    // 2. Update local state
-    deleteLocalMessageState(msgId);
-    // 3. Send delete signal to partner
-    await sendDeleteSignal(chatId, msgId, partnerUid);
-  }, [selectedMessage, chatId, partnerUid, deleteLocalMessageState]);
+    const fileName = selectedMessage.fileName;
+    const msgType = selectedMessage.type;
+    const localUri = selectedMessage.localUri;
+    setSelectedMessage(null);
+
+    // 1. Mark as deleted locally in MMKV
+    markMessageAsDeletedLocally(chatId, msgId);
+    // 2. Mark as deleted in local state
+    markLocalMessageAsDeletedState(msgId);
+    // 3. Clean up local media files
+    if (msgType !== 'TEXT') {
+      deleteLocalMediaFile({ id: msgId, type: msgType, localUri } as any).catch(() => {});
+    }
+    // 4. Send delete signal to partner
+    await sendDeleteSignal(chatId, msgId, partnerUid, fileName);
+  }, [selectedMessage, chatId, partnerUid, markLocalMessageAsDeletedState]);
 
   const handleStartEdit = useCallback(() => {
     if (!selectedMessage) return;
     
     // Safety check: verify within window
-    const isWithinWindow = Date.now() - selectedMessage.createdAt < EDIT_DELETE_WINDOW_MS;
+    const isWithinWindow = Date.now() - getMessageTime(selectedMessage) < EDIT_DELETE_WINDOW_MS;
     if (!isWithinWindow || !selectedMessage.isMine) return;
 
     triggerSelection(); // Selection haptic
@@ -875,7 +981,7 @@ export default function ChatRoomScreen() {
     if (!newText) return;
 
     // Safety check: verify within window
-    const isWithinWindow = Date.now() - selectedMessage.createdAt < EDIT_DELETE_WINDOW_MS;
+    const isWithinWindow = Date.now() - getMessageTime(selectedMessage) < EDIT_DELETE_WINDOW_MS;
     if (!isWithinWindow || !selectedMessage.isMine) {
       setEditModalVisible(false);
       setSelectedMessage(null);
@@ -1126,7 +1232,7 @@ export default function ChatRoomScreen() {
             <View style={styles.modalHeaderLine} />
             <Text style={styles.modalTitle}>Message Options</Text>
             
-            {selectedMessage?.isMine && (Date.now() - selectedMessage.createdAt < EDIT_DELETE_WINDOW_MS) && (
+            {selectedMessage && selectedMessage.isMine && selectedMessage.type === 'TEXT' && (Date.now() - getMessageTime(selectedMessage) < EDIT_DELETE_WINDOW_MS) && (
               <TouchableOpacity
                 style={styles.modalOption}
                 onPress={handleStartEdit}
@@ -1137,7 +1243,7 @@ export default function ChatRoomScreen() {
               </TouchableOpacity>
             )}
 
-            {selectedMessage?.isMine && (Date.now() - selectedMessage.createdAt < EDIT_DELETE_WINDOW_MS) && (
+            {selectedMessage && selectedMessage.isMine && selectedMessage.type !== 'DELETED' && (Date.now() - getMessageTime(selectedMessage) < EDIT_DELETE_WINDOW_MS) && (
               <TouchableOpacity
                 style={styles.modalOption}
                 onPress={handleDeleteForEveryone}
@@ -1157,7 +1263,7 @@ export default function ChatRoomScreen() {
             >
               <MaterialIcons name="delete" size={20} color={C.errorColor} />
               <Text style={[styles.modalOptionText, { color: C.errorColor }]}>
-                Delete for Me
+                {selectedMessage?.type === 'DELETED' ? 'Delete' : 'Delete for Me'}
               </Text>
             </TouchableOpacity>
 
@@ -1395,6 +1501,9 @@ const styles = StyleSheet.create({
   bubbleText:              { fontSize: 16, lineHeight: 22, fontWeight: '500' },
   bubbleTextIn:            { color: C.onSurface },
   bubbleTextOut:           { color: C.onPrimaryFixed },
+
+  deletedBubble:           { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 4, paddingVertical: 2 },
+  deletedText:             { fontSize: 15, fontStyle: 'italic', color: C.onSurfaceVariant, fontWeight: '400' },
 
   metaRow:                 { flexDirection: 'row', alignItems: 'center', marginTop: 4, marginRight: 4 },
   metaTime:                { fontSize: 10, fontWeight: '600', color: C.onSurfaceVariant, letterSpacing: 0.3 },

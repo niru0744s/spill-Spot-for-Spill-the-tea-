@@ -25,6 +25,7 @@ import {
   getDocs,
   writeBatch,
   increment,
+  deleteDoc,
 } from 'firebase/firestore';
 import { randomUUID } from 'expo-crypto';
 import { db, auth } from '@/config/firebase';
@@ -42,9 +43,25 @@ import {
 import { sendPushNotification } from './notificationService';
 import { storage } from './mmkv';
 import { isUserOnline } from './presenceService';
-import * as FileSystem from 'expo-file-system/legacy';
+import { File, Directory, Paths } from 'expo-file-system';
 import { uploadMediaToSupabase, deleteMediaFromSupabase } from './supabaseService';
+import { Platform } from 'react-native';
+import { saveMediaBlob, deleteMediaBlob } from './webMediaDb';
+
 export const EDIT_DELETE_WINDOW_MS = 3 * 60 * 60 * 1000; // 3 hours
+
+function safeRandomUUID(): string {
+  try {
+    return randomUUID();
+  } catch {
+    // Math.random fallback for non-secure web browser contexts
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === 'x' ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Push token MMKV cache  (avoids one Firestore read per outgoing message)
@@ -99,7 +116,7 @@ export async function sendMessage({
   partnerMeta?: Partial<ChatMeta>;
 }): Promise<StoredMessage> {
   const createdAt = Date.now();
-  const id = `${createdAt}_${randomUUID().substring(0, 8)}`;
+  const id = `${createdAt}_${safeRandomUUID().substring(0, 8)}`;
 
   // 1️⃣ Build the message object
   const msg: StoredMessage = {
@@ -332,7 +349,7 @@ export async function sendEditSignal(
   partnerUid: string
 ): Promise<void> {
   try {
-    const signalId = randomUUID();
+    const signalId = safeRandomUUID();
     const msgRef = doc(db, 'chats', chatId, 'messages', signalId);
 
     // Write edit signal to Firestore
@@ -360,11 +377,15 @@ export async function sendEditSignal(
 export async function sendDeleteSignal(
   chatId: string,
   messageId: string,
-  partnerUid: string
+  partnerUid: string,
+  fileName?: string
 ): Promise<void> {
   try {
-    const signalId = randomUUID();
+    const signalId = safeRandomUUID();
     const msgRef = doc(db, 'chats', chatId, 'messages', signalId);
+
+    // Also delete the original message document from Firestore if it exists (so receiver won't pull it)
+    await deleteDoc(doc(db, 'chats', chatId, 'messages', messageId)).catch(() => {});
 
     // Write delete signal to Firestore
     await setDoc(msgRef, {
@@ -379,11 +400,49 @@ export async function sendDeleteSignal(
     const inboxRef = doc(db, 'users', partnerUid, 'inbox', chatId);
     await setDoc(inboxRef, {
       chatId,
-      lastMessage: 'Deleted a message',
+      lastMessage: '🚫 Message deleted',
       lastMessageAt: serverTimestamp(),
     }, { merge: true });
+
+    // Also write to own inbox doc so our own Firestore preview is kept up to date
+    const myInboxRef = doc(db, 'users', auth.currentUser?.uid ?? '', 'inbox', chatId);
+    await setDoc(myInboxRef, {
+      chatId,
+      lastMessage: '🚫 Message deleted',
+      lastMessageAt: serverTimestamp(),
+    }, { merge: true });
+
+    // Clean up Supabase storage if it was a media file
+    if (fileName) {
+      const ext = fileName.split('.').pop() || '';
+      const filenameInBucket = `${chatId}/${messageId}.${ext}`;
+      await deleteMediaFromSupabase(filenameInBucket);
+    }
   } catch (err) {
     console.warn('[messageService] Failed to send delete signal to Firestore:', err);
+  }
+}
+
+export async function deleteLocalMediaFile(msg: StoredMessage): Promise<void> {
+  if (!msg || msg.type === 'TEXT') return;
+
+  if (Platform.OS === 'web') {
+    try {
+      await deleteMediaBlob(msg.id);
+    } catch (err) {
+      console.warn('[messageService] Failed to delete IndexedDB media blob:', err);
+    }
+  } else {
+    if (msg.localUri && msg.localUri.startsWith('file://')) {
+      try {
+        const file = new File(msg.localUri);
+        if (file.exists) {
+          file.delete();
+        }
+      } catch (err) {
+        console.warn('[messageService] Failed to delete local file:', err);
+      }
+    }
   }
 }
 
@@ -478,27 +537,40 @@ export async function sendMediaMessage({
 }): Promise<StoredMessage> {
   const ext = fileName.split('.').pop() || '';
   const createdAt = Date.now();
-  const id = `${createdAt}_${randomUUID().substring(0, 8)}`;
+  const id = `${createdAt}_${safeRandomUUID().substring(0, 8)}`;
   
   const typeFolder = type.toLowerCase();
-  const destDir = `${FileSystem.documentDirectory}media/${chatId}/${typeFolder}/`;
+  const destDir = `${Paths.document.uri}media/${chatId}/${typeFolder}/`;
   const destUri = `${destDir}${id}.${ext}`;
 
-  // Ensure directory exists and copy file persistently
-  await FileSystem.makeDirectoryAsync(destDir, { intermediates: true });
-  await FileSystem.copyAsync({ from: localUri, to: destUri });
+  let finalLocalUri = localUri;
+  if (Platform.OS === 'web') {
+    try {
+      const res = await fetch(localUri);
+      const blob = await res.blob();
+      await saveMediaBlob(id, blob, mimeType, fileName);
+    } catch (err) {
+      console.warn('[messageService] Failed to cache sent media to IndexedDB:', err);
+    }
+  } else {
+    const dir = new Directory(destDir);
+    dir.create({ intermediates: true, idempotent: true });
+    const srcFile = new File(localUri);
+    await srcFile.copy(new File(destUri));
+    finalLocalUri = destUri;
+  }
 
-  // Build local message object (content = localUri)
+  // Build local message object (content = finalLocalUri)
   const msg: StoredMessage = {
     id,
     chatId,
     senderUid,
-    content: destUri,
+    content: finalLocalUri,
     type,
     status: 'SENDING',
     createdAt,
     isMine: true,
-    localUri: destUri,
+    localUri: finalLocalUri,
     fileName,
     fileSize,
     mimeType,
@@ -533,7 +605,7 @@ export async function sendMediaMessage({
   (async () => {
     try {
       const filenameInBucket = `${chatId}/${id}.${ext}`;
-      const publicUrl = await uploadMediaToSupabase(destUri, filenameInBucket, mimeType);
+      const publicUrl = await uploadMediaToSupabase(finalLocalUri, filenameInBucket, mimeType);
 
       if (!publicUrl) {
         throw new Error('Supabase upload returned null URL');
@@ -606,6 +678,26 @@ export async function sendMediaMessage({
             lastMessage: lastMsgText,
             lastMessageAt: serverTimestamp(),
             unreadCount: isPartnerOnChat ? 0 : increment(1),
+            unread: isPartnerOnChat ? 0 : increment(1),
+            isGroup: false,
+          },
+          { merge: true }
+        );
+
+        // 2. Also write to own inbox doc so our own Firestore preview is kept up to date
+        const myInboxRef = doc(db, 'users', senderUid, 'inbox', chatId);
+        const myMeta = getChatMeta(chatId);
+        await setDoc(
+          myInboxRef,
+          {
+            chatId,
+            partnerUid: actualPartnerUid,
+            partnerName: myMeta?.partnerName ?? 'Tea Friend',
+            partnerPhoto: myMeta?.partnerPhoto ?? null,
+            lastMessage: lastMsgText,
+            lastMessageAt: serverTimestamp(),
+            unreadCount: 0,
+            unread: 0,
             isGroup: false,
           },
           { merge: true }
@@ -636,26 +728,74 @@ export async function downloadAndConsumeMediaMessage(
   const { id, type, content: mediaUrl, fileName } = message;
   if (!mediaUrl || !mediaUrl.startsWith('http')) return; // already local or invalid
 
+  if (Platform.OS === 'web') {
+    try {
+      const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANONKEY;
+      const authenticatedUrl = mediaUrl.replace('/object/public/', '/object/authenticated/');
+
+      const response = await fetch(authenticatedUrl, {
+        headers: {
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+          'apikey':        supabaseAnonKey || '',
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Web media download failed with status ${response.status}`);
+      }
+      const blob = await response.blob();
+
+      // Store in IndexedDB
+      await saveMediaBlob(id, blob, message.mimeType || '', fileName || '');
+
+      // Create Object URL
+      const objectUrl = URL.createObjectURL(blob);
+
+      const downloadedMsg: StoredMessage = {
+        ...message,
+        content: objectUrl,
+        localUri: objectUrl,
+      };
+      appendMessage(downloadedMsg);
+
+      // Delete from Supabase
+      const ext = fileName?.split('.').pop() || '';
+      const filenameInBucket = `${chatId}/${id}.${ext}`;
+      await deleteMediaFromSupabase(filenameInBucket);
+      return;
+    } catch (error) {
+      console.error(`[messageService] Web download failed for message ${id}:`, error);
+      throw error;
+    }
+  }
+
   const typeFolder = type.toLowerCase();
-  const destDir = `${FileSystem.documentDirectory}media/${chatId}/${typeFolder}/`;
+  const destDir = `${Paths.document.uri}media/${chatId}/${typeFolder}/`;
   const ext = fileName?.split('.').pop() || '';
   const destUri = `${destDir}${id}.${ext}`;
 
   try {
     // Check disk space
-    const freeSpace = await FileSystem.getFreeDiskStorageAsync();
+    const freeSpace = Paths.availableDiskSpace;
     const fileSize = message.fileSize || 0;
     if (freeSpace < fileSize + 10 * 1024 * 1024) {
       throw new Error('Insufficient disk space');
     }
 
-    await FileSystem.makeDirectoryAsync(destDir, { intermediates: true });
+    const dir = new Directory(destDir);
+    dir.create({ intermediates: true, idempotent: true });
 
-    // Download natively
-    const result = await FileSystem.downloadAsync(mediaUrl, destUri);
-    if (result.status !== 200) {
-      throw new Error(`Media download failed with status ${result.status}`);
-    }
+    const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANONKEY;
+    const authenticatedUrl = mediaUrl.replace('/object/public/', '/object/authenticated/');
+
+    // Download natively with auth headers
+    await File.downloadFileAsync(authenticatedUrl, new File(destUri), {
+      headers: {
+        'Authorization': `Bearer ${supabaseAnonKey}`,
+        'apikey':        supabaseAnonKey || '',
+      },
+      idempotent: true,
+    });
 
     // Update MMKV message
     const downloadedMsg = {

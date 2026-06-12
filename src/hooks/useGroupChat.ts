@@ -20,6 +20,18 @@ import { getMessages, appendMessage, updateMessageStatus, type StoredMessage } f
 import { sendPushNotification } from '@/services/notificationService';
 import { randomUUID } from 'expo-crypto';
 
+function safeRandomUUID(): string {
+  try {
+    return randomUUID();
+  } catch {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === 'x' ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  }
+}
+
 export function useGroupChat(groupId: string) {
   const currentUid = auth.currentUser?.uid ?? '';
   const currentName = auth.currentUser?.displayName ?? 'Someone';
@@ -150,7 +162,7 @@ export function useGroupChat(groupId: string) {
     async (content: string, type: 'TEXT' | 'IMAGE' = 'TEXT'): Promise<boolean> => {
       if (!currentUid || !groupId) return false;
 
-      const messageId = randomUUID();
+      const messageId = safeRandomUUID();
       const createdAt = Date.now();
 
       // Create local optimistic message

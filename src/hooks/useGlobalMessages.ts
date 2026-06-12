@@ -34,12 +34,14 @@ import {
   getChatMeta,
   deleteMessageLocally,
   editMessageLocally,
+  markMessageAsDeletedLocally,
+  getMessagePreview,
   type StoredMessage,
 } from '@/services/chatStorage';
 import { router } from 'expo-router';
 import { useBannerStore } from '@/store/bannerStore';
 import { getActiveChatId } from '@/services/activeChat';
-import { EDIT_DELETE_WINDOW_MS } from '@/services/messageService';
+import { EDIT_DELETE_WINDOW_MS, downloadAndConsumeMediaMessage, deleteLocalMediaFile } from '@/services/messageService';
 
 import { useAuth } from '@/hooks/useAuth';
 
@@ -139,10 +141,12 @@ function attachChatListener(
       if (data.type === 'DELETE_SIGNAL') {
         const localMsgs = getMessages(chatId);
         const target = localMsgs.find(m => m.id === data.targetMessageId);
-        const isWithinWindow = target && (Date.now() - target.createdAt < EDIT_DELETE_WINDOW_MS + 60 * 60 * 1000); // 3 hrs + 1 hr skew buffer
 
-        if (isWithinWindow) {
-          deleteMessageLocally(chatId, data.targetMessageId);
+        if (target) {
+          if (target.type !== 'TEXT') {
+            deleteLocalMediaFile(target).catch(() => {});
+          }
+          markMessageAsDeletedLocally(chatId, data.targetMessageId);
         }
         deleteDoc(doc(db, 'chats', chatId, 'messages', msgId)).catch(() => {});
         return;
@@ -151,9 +155,8 @@ function attachChatListener(
       if (data.type === 'EDIT_SIGNAL') {
         const localMsgs = getMessages(chatId);
         const target = localMsgs.find(m => m.id === data.targetMessageId);
-        const isWithinWindow = target && (Date.now() - target.createdAt < EDIT_DELETE_WINDOW_MS + 60 * 60 * 1000); // 3 hrs + 1 hr skew buffer
 
-        if (isWithinWindow) {
+        if (target) {
           editMessageLocally(chatId, data.targetMessageId, data.content);
         }
         deleteDoc(doc(db, 'chats', chatId, 'messages', msgId)).catch(() => {});
@@ -169,10 +172,13 @@ function attachChatListener(
         chatId,
         senderUid: data.senderUid,
         content:   data.content,
-        type:      (data.type as 'TEXT' | 'IMAGE') ?? 'TEXT',
+        type:      (data.type as any) ?? 'TEXT',
         status:    (data.status as StoredMessage['status']) ?? 'SENT',
         createdAt,
         isMine:    false,
+        fileName:  data.fileName || undefined,
+        fileSize:  data.fileSize || undefined,
+        mimeType:  data.mimeType || undefined,
       };
 
       // Check if we already have this message in MMKV
@@ -186,6 +192,13 @@ function attachChatListener(
 
       // Save to MMKV synchronously first (critical to prevent crash loss)
       appendMessage(msg);
+
+      // Trigger background download and consumption of transit media
+      if (msg.type !== 'TEXT') {
+        downloadAndConsumeMediaMessage(chatId, msg).catch((err) => {
+          console.error('[useGlobalMessages] Background media download failed:', err);
+        });
+      }
 
       // Immediately delete transit message document from Firestore
       deleteDoc(doc(db, 'chats', chatId, 'messages', msgId)).catch(() => {});
@@ -202,7 +215,7 @@ function attachChatListener(
         // Trigger sliding In-App Banner alert overlay
         useBannerStore.getState().showBanner(
           partnerName,
-          msg.content,
+          getMessagePreview(msg),
           partnerPhoto,
           () => {
             router.push({

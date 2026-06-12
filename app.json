@@ -40,7 +40,14 @@
       ],
       "expo-sharing",
       "expo-video",
-      "expo-image"
+      "expo-image",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Allow Spill to access your microphone to record voice messages.",
+          "recordAudioAndroid": true
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

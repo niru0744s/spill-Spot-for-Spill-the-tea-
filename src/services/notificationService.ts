@@ -30,6 +30,10 @@ Notifications.setNotificationHandler({
  * and persists it to the user's Firestore document.
  */
 export async function registerForPushNotificationsAsync(uid: string): Promise<string | null> {
+  if (Platform.OS === 'web') {
+    return null;
+  }
+
   if (!Device.isDevice) {
     if (__DEV__) {
       console.log('[NotificationService] Must use a physical device for Push Notifications');
@@ -111,6 +115,13 @@ export async function sendPushNotification({
   body: string;
   data?: Record<string, any>;
 }): Promise<void> {
+  if (Platform.OS === 'web') {
+    if (__DEV__) {
+      console.log('[NotificationService] Client-side push notifications are blocked by browser CORS. Use server-side triggers.');
+    }
+    return;
+  }
+
   const message = {
     to,
     sound: 'default',

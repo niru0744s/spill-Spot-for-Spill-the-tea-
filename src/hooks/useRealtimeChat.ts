@@ -14,6 +14,8 @@
  */
 
 import { useEffect, useRef, useCallback, useState } from 'react';
+import { Platform } from 'react-native';
+import { getMediaBlob } from '@/services/webMediaDb';
 import {
   collection,
   query,
@@ -34,9 +36,10 @@ import {
   markMessagesAsRead,
   EDIT_DELETE_WINDOW_MS,
   downloadAndConsumeMediaMessage,
+  deleteLocalMediaFile,
 } from '@/services/messageService';
 import { triggerMediumImpact } from '@/services/hapticService';
-import { getMessages, updateMessageStatus, getChatMeta, saveChatMeta, clearUnread, editMessageLocally, deleteMessageLocally, type StoredMessage } from '@/services/chatStorage';
+import { getMessages, updateMessageStatus, getChatMeta, saveChatMeta, clearUnread, editMessageLocally, deleteMessageLocally, markMessageAsDeletedLocally, getMessagePreview, type StoredMessage } from '@/services/chatStorage';
 
 // ---------------------------------------------------------------------------
 // Hook
@@ -65,6 +68,100 @@ export function useRealtimeChat(chatId: string) {
       prev.map(m => m.id === messageId ? { ...m, status } : m)
     );
   }, []);
+
+  const editLocalMessageState = useCallback((messageId: string, content: string) => {
+    setMessages(prev =>
+      prev.map(m => m.id === messageId ? { ...m, content } : m)
+    );
+  }, []);
+
+  const deleteLocalMessageState = useCallback((messageId: string) => {
+    setMessages(prev => prev.filter(m => m.id !== messageId));
+  }, []);
+
+  const markLocalMessageAsDeletedState = useCallback((messageId: string) => {
+    setMessages(prev =>
+      prev.map(m =>
+        m.id === messageId
+          ? {
+              ...m,
+              type: 'DELETED',
+              content: 'Message deleted',
+              localUri: undefined,
+              fileName: undefined,
+              fileSize: undefined,
+              mimeType: undefined,
+            }
+          : m
+      )
+    );
+  }, []);
+
+  // ── Web Media Hydration (IndexedDB Blobs → Object URLs) ──────────────────
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+
+    let active = true;
+    async function hydrateWebMedia() {
+      const mediaMessages = messages.filter(m => m.type !== 'TEXT' && m.localUri);
+      if (mediaMessages.length === 0) return;
+
+      let updated = false;
+      const hydratedMessages = await Promise.all(
+        messages.map(async (msg) => {
+          if (msg.type !== 'TEXT' && msg.id) {
+            const record = await getMediaBlob(msg.id);
+            if (record && record.blob) {
+              const objectUrl = URL.createObjectURL(record.blob);
+              updated = true;
+              return {
+                ...msg,
+                localUri: objectUrl,
+                content: msg.content.startsWith('blob:') ? objectUrl : msg.content,
+              };
+            }
+          }
+          return msg;
+        })
+      );
+
+      if (active && updated) {
+        setMessages(hydratedMessages);
+      }
+    }
+
+    hydrateWebMedia();
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatId]);
+
+  // ── Mount-time Undownloaded Media Check ──────────────────────────────────
+  useEffect(() => {
+    const undownloaded = messages.filter(
+      m => m.type !== 'TEXT' && m.content?.startsWith('http') && !m.localUri
+    );
+
+    if (undownloaded.length === 0) return;
+
+    undownloaded.forEach((msg) => {
+      downloadAndConsumeMediaMessage(chatId, msg).then(() => {
+        setMessages(prev =>
+          prev.map(m => {
+            if (m.id === msg.id) {
+              const fresh = getMessages(chatId).find(x => x.id === msg.id);
+              return fresh ? fresh : m;
+            }
+            return m;
+          })
+        );
+      }).catch((err) => {
+        console.error('[useRealtimeChat] Mount-time download failed:', err);
+      });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatId]);
 
   // ── 1. Message listener ──────────────────────────────────────────────────
   useEffect(() => {
@@ -95,9 +192,22 @@ export function useRealtimeChat(chatId: string) {
               ? data.createdAt.toMillis()
               : Date.now();
             if (meta && msgCreatedAt >= (meta.lastMessageAt ?? 0)) {
+              const tempMsg: StoredMessage = {
+                id: msgId,
+                chatId,
+                senderUid: data.senderUid,
+                content: data.content ?? '',
+                type: data.type ?? 'TEXT',
+                status: data.status ?? 'SENT',
+                createdAt: msgCreatedAt,
+                isMine: true,
+                fileName: data.fileName ?? undefined,
+                fileSize: data.fileSize ?? undefined,
+                mimeType: data.mimeType ?? undefined,
+              };
               saveChatMeta({
                 ...meta,
-                lastMessage: data.content ?? '',
+                lastMessage: getMessagePreview(tempMsg),
                 lastMessageAt: msgCreatedAt,
                 isBackedUp: false,
               });
@@ -109,11 +219,13 @@ export function useRealtimeChat(chatId: string) {
           if (data.type === 'DELETE_SIGNAL') {
             const localMsgs = getMessages(chatId);
             const target = localMsgs.find(m => m.id === data.targetMessageId);
-            const isWithinWindow = target && (Date.now() - target.createdAt < EDIT_DELETE_WINDOW_MS + 60 * 60 * 1000); // 3 hrs + 1 hr skew buffer
             
-            if (isWithinWindow) {
-              deleteMessageLocally(chatId, data.targetMessageId);
-              setMessages(prev => prev.filter(m => m.id !== data.targetMessageId));
+            if (target) {
+              if (target.type !== 'TEXT') {
+                deleteLocalMediaFile(target).catch(() => {});
+              }
+              markMessageAsDeletedLocally(chatId, data.targetMessageId);
+              markLocalMessageAsDeletedState(data.targetMessageId);
             }
             deleteDoc(doc(db, 'chats', chatId, 'messages', msgId)).catch(() => {});
             return;
@@ -122,9 +234,8 @@ export function useRealtimeChat(chatId: string) {
           if (data.type === 'EDIT_SIGNAL') {
             const localMsgs = getMessages(chatId);
             const target = localMsgs.find(m => m.id === data.targetMessageId);
-            const isWithinWindow = target && (Date.now() - target.createdAt < EDIT_DELETE_WINDOW_MS + 60 * 60 * 1000); // 3 hrs + 1 hr skew buffer
 
-            if (isWithinWindow) {
+            if (target) {
               editMessageLocally(chatId, data.targetMessageId, data.content);
               setMessages(prev =>
                 prev.map(m => m.id === data.targetMessageId ? { ...m, content: data.content } : m)
@@ -198,7 +309,7 @@ export function useRealtimeChat(chatId: string) {
     });
 
     return () => { unsubMsgsRef.current?.(); };
-  }, [chatId, currentUid, updateLocalStatus]);
+  }, [chatId, currentUid, updateLocalStatus, markLocalMessageAsDeletedState]);
 
   // ── 2. Typing indicator listener ─────────────────────────────────────────
   useEffect(() => {
@@ -270,16 +381,6 @@ export function useRealtimeChat(chatId: string) {
     };
   }, [stopTyping]);
 
-  const editLocalMessageState = useCallback((messageId: string, content: string) => {
-    setMessages(prev =>
-      prev.map(m => m.id === messageId ? { ...m, content } : m)
-    );
-  }, []);
-
-  const deleteLocalMessageState = useCallback((messageId: string) => {
-    setMessages(prev => prev.filter(m => m.id !== messageId));
-  }, []);
-
   return {
     messages,
     isOtherTyping,
@@ -288,6 +389,7 @@ export function useRealtimeChat(chatId: string) {
     updateLocalStatus,
     editLocalMessageState,
     deleteLocalMessageState,
+    markLocalMessageAsDeletedState,
     markAsRead,
     notifyTyping,
     stopTyping,
