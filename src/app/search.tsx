@@ -90,7 +90,7 @@ function AmbientOrbs() {
   }, []);
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+    <View style={[StyleSheet.absoluteFill, { pointerEvents: 'none' }]}>
       <Animated.View style={[styles.orb, styles.orb1, { transform: [{ translateX: orb1.x }, { translateY: orb1.y }] }]} />
       <Animated.View style={[styles.orb, styles.orb2, { transform: [{ translateX: orb2.x }, { translateY: orb2.y }] }]} />
       <Animated.View style={[styles.orb, styles.orb3, { transform: [{ translateX: orb3.x }, { translateY: orb3.y }] }]} />

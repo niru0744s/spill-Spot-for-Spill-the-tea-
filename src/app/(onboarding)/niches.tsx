@@ -235,8 +235,8 @@ export default function NicheSelectionScreen() {
     <SafeAreaView style={styles.safeArea}>
 
       {/* ── Background blobs ─────────────────────────────────────────────── */}
-      <View style={styles.blobTopRight} pointerEvents="none" />
-      <View style={styles.blobBottomLeft} pointerEvents="none" />
+      <View style={[styles.blobTopRight, { pointerEvents: 'none' }]} />
+      <View style={[styles.blobBottomLeft, { pointerEvents: 'none' }]} />
 
       {/* ── Header ───────────────────────────────────────────────────────── */}
       <View style={styles.header}>

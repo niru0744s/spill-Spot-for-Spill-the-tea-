@@ -5,7 +5,8 @@
  * Decodes base64 image data to a binary buffer and uploads it directly to Supabase Storage.
  * Bypasses the Expo SDK 56 Winter CG fetch 'Unsupported FormDataPart implementation' issue.
  */
-import * as FileSystem from 'expo-file-system/legacy';
+import { File, UploadType } from 'expo-file-system';
+import { Platform } from 'react-native';
 
 export async function uploadProfilePhotoToSupabase(
   base64Data: string,
@@ -116,19 +117,43 @@ export async function uploadMediaToSupabase(
   try {
     const uploadUrl = `${supabaseUrl}/storage/v1/object/${bucket}/${filename}`;
 
-    const response = await FileSystem.uploadAsync(uploadUrl, localUri, {
-      headers: {
-        'Authorization': `Bearer ${supabaseAnonKey}`,
-        'apikey':        supabaseAnonKey,
-        'x-upsert':      'true',
-        'Content-Type':  mimeType,
-      },
-      httpMethod: 'PUT',
-      uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
-    });
+    if (Platform.OS === 'web') {
+      // Fetch the Object URL/Local URI to get the binary Blob in browser memory
+      const blobResponse = await fetch(localUri);
+      const blob = await blobResponse.blob();
 
-    if (response.status !== 200 && response.status !== 201) {
-      throw new Error(`Media upload failed with status ${response.status}: ${response.body}`);
+      const response = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+          'apikey':        supabaseAnonKey,
+          'x-upsert':      'true',
+          'Content-Type':  mimeType,
+        },
+        body: blob,
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`Web media upload failed with status ${response.status}: ${errText}`);
+      }
+    } else {
+      // Mobile native binary stream
+      const file = new File(localUri);
+      const response = await file.upload(uploadUrl, {
+        headers: {
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+          'apikey':        supabaseAnonKey,
+          'x-upsert':      'true',
+          'Content-Type':  mimeType,
+        },
+        httpMethod: 'PUT',
+        uploadType: UploadType.BINARY_CONTENT,
+      });
+
+      if (response.status !== 200 && response.status !== 201) {
+        throw new Error(`Media upload failed with status ${response.status}: ${response.body}`);
+      }
     }
 
     // Return the public download URL

@@ -102,7 +102,7 @@ function OrbBackground() {
   );
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+    <View style={[StyleSheet.absoluteFill, { pointerEvents: 'none' }]}>
       {/* Orb 1 — matcha, top-left */}
       <Animated.View style={[styles.orb, styles.orb1, { transform: [{ translateX: orb1x }, { translateY: orb1y }] }]} />
       {/* Orb 2 — peach/secondary, bottom-right */}

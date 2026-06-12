@@ -101,8 +101,8 @@ function LiquidBlob({ delay, x, size }: { delay: number; x: number; size: number
         backgroundColor: '#037524',
         opacity,
         transform: [{ translateY: y }],
+        pointerEvents: 'none',
       }}
-      pointerEvents="none"
     />
   );
 }
