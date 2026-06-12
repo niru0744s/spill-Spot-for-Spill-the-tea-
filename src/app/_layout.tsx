@@ -15,7 +15,7 @@ import { usePresence } from "@/hooks/usePresence";
 import { registerForPushNotificationsAsync } from "@/services/notificationService";
 import { InAppBanner } from "@/components/InAppBanner";
 import * as Notifications from "expo-notifications";
-import { Stack, useRouter, useSegments } from "expo-router";
+import { Stack, useRouter, useSegments, useRootNavigationState } from "expo-router";
 import { useEffect } from "react";
 import { ActivityIndicator, StatusBar, View } from "react-native";
 
@@ -23,6 +23,7 @@ export default function RootLayout() {
   const { isInitialized, firebaseUser, user } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  const rootNavigationState = useRootNavigationState();
 
   // 🔥 Wire up Firebase auth session listener — runs for entire app lifetime
   useSessionListener();
@@ -67,31 +68,27 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (!isInitialized) return;
+    if (!rootNavigationState?.key) return;
 
     const inAuthGroup = segments[0] === "(auth)";
     const inOnboardingGroup = segments[0] === "(onboarding)";
     const hasNiches = (user?.niches?.length ?? 0) >= 3;
 
-    // Defer redirect to the next tick to ensure root navigator finishes mounting
-    const timeout = setTimeout(() => {
-      if (!firebaseUser && !inAuthGroup) {
-        // Not signed in — send to auth screens
-        router.replace("/(auth)");
-      } else if (firebaseUser && inAuthGroup) {
-        // Just signed in / signed up — check if niches are set
-        if (hasNiches) {
-          router.replace("/(tabs)/chats");
-        } else {
-          router.replace("/(onboarding)/niches");
-        }
-      } else if (firebaseUser && inOnboardingGroup && hasNiches) {
-        // Onboarding just completed — niches saved, move to main app
+    if (!firebaseUser && !inAuthGroup) {
+      // Not signed in — send to auth screens
+      router.replace("/(auth)");
+    } else if (firebaseUser && inAuthGroup) {
+      // Just signed in / signed up — check if niches are set
+      if (hasNiches) {
         router.replace("/(tabs)/chats");
+      } else {
+        router.replace("/(onboarding)/niches");
       }
-    }, 0);
-
-    return () => clearTimeout(timeout);
-  }, [firebaseUser, user, isInitialized, segments]);
+    } else if (firebaseUser && inOnboardingGroup && hasNiches) {
+      // Onboarding just completed — niches saved, move to main app
+      router.replace("/(tabs)/chats");
+    }
+  }, [firebaseUser, user, isInitialized, segments, rootNavigationState?.key]);
 
   if (!isInitialized) {
     return (

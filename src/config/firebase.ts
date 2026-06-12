@@ -11,18 +11,18 @@
  * Type declarations for firebase/* submodules live in src/types/modules.d.ts.
  */
 
-import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
-import {
-  initializeAuth,
-  getAuth,
-  getReactNativePersistence,
-  type Auth,
-} from "firebase/auth";
-import { getFirestore, type Firestore } from "firebase/firestore";
-import { getStorage, type FirebaseStorage } from "firebase/storage";
-import { getDataConnect, type DataConnect } from "firebase/data-connect";
 import { connectorConfig } from "@/dataconnect-generated";
 import ReactNativeAsyncStorage from "@react-native-async-storage/async-storage";
+import { getApps, initializeApp, type FirebaseApp } from "firebase/app";
+import {
+  getAuth,
+  getReactNativePersistence,
+  initializeAuth,
+  type Auth,
+} from "firebase/auth";
+import { getDataConnect, type DataConnect } from "firebase/data-connect";
+import { getFirestore, type Firestore } from "firebase/firestore";
+import { getStorage, type FirebaseStorage } from "firebase/storage";
 
 // ---------------------------------------------------------------------------
 // Firebase project config — pulled from Expo env vars (EXPO_PUBLIC_ prefix)
@@ -40,7 +40,6 @@ const firebaseConfig = {
 // Guard: initialize the Firebase app only once
 // (critical for React Native HMR / fast-refresh)
 // ---------------------------------------------------------------------------
-console.log("DEBUG: firebaseConfig =", firebaseConfig);
 
 const app: FirebaseApp =
   getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
@@ -62,4 +61,5 @@ const db: Firestore = getFirestore(app, "default");
 const storage: FirebaseStorage = getStorage(app);
 const dataConnect: DataConnect = getDataConnect(app, connectorConfig);
 
-export { app, auth, db, storage, dataConnect };
+export { app, auth, dataConnect, db, storage };
+
