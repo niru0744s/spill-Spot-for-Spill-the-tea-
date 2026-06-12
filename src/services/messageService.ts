@@ -12,41 +12,41 @@
  *   - Updates unread count
  */
 
+import { auth, db } from '@/config/firebase';
+import { randomUUID } from 'expo-crypto';
+import { Directory, File, Paths } from 'expo-file-system';
 import {
   collection,
+  deleteDoc,
   doc,
   getDoc,
-  setDoc,
-  updateDoc,
-  serverTimestamp,
-  Timestamp,
-  query,
-  where,
   getDocs,
-  writeBatch,
   increment,
-  deleteDoc,
+  query,
+  serverTimestamp,
+  setDoc,
+  Timestamp,
+  updateDoc,
+  where,
+  writeBatch,
 } from 'firebase/firestore';
-import { randomUUID } from 'expo-crypto';
-import { db, auth } from '@/config/firebase';
+import { Platform } from 'react-native';
 import {
   appendMessage,
-  updateMessageStatus,
-  enqueueRetry,
   dequeueRetry,
+  enqueueRetry,
+  getChatMeta,
   incrementUnread,
   saveChatMeta,
-  getChatMeta,
-  type StoredMessage,
+  updateMessageStatus,
   type ChatMeta,
+  type StoredMessage,
 } from './chatStorage';
-import { sendPushNotification } from './notificationService';
 import { storage } from './mmkv';
+import { sendPushNotification } from './notificationService';
 import { isUserOnline } from './presenceService';
-import { File, Directory, Paths } from 'expo-file-system';
-import { uploadMediaToSupabase, deleteMediaFromSupabase } from './supabaseService';
-import { Platform } from 'react-native';
-import { saveMediaBlob, deleteMediaBlob } from './webMediaDb';
+import { deleteMediaFromSupabase, uploadMediaToSupabase } from './supabaseService';
+import { deleteMediaBlob, saveMediaBlob } from './webMediaDb';
 
 export const EDIT_DELETE_WINDOW_MS = 3 * 60 * 60 * 1000; // 3 hours
 
@@ -516,16 +516,7 @@ export function handleIncomingMessage({
   return msg;
 }
 
-export async function sendMediaMessage({
-  chatId,
-  senderUid,
-  localUri,
-  type,
-  fileName,
-  fileSize,
-  mimeType,
-  partnerMeta,
-}: {
+export async function sendMediaMessage({chatId,senderUid,localUri,type,fileName,fileSize,mimeType,partnerMeta}: {
   chatId: string;
   senderUid: string;
   localUri: string;

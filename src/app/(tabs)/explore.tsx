@@ -28,7 +28,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   FlatList,
-  Animated,
   RefreshControl,
   ActivityIndicator,
   Image,
@@ -36,6 +35,15 @@ import {
   Platform,
   Dimensions,
 } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withRepeat,
+  withSequence,
+  withTiming,
+  FadeInDown,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAuth } from '@/hooks/useAuth';
@@ -175,20 +183,26 @@ interface GNewsArticle {
 
 /** Shown at the top when the user hasn't set their niches yet */
 function NicheSetBanner({ onPress }: { onPress: () => void }) {
-  const pulse = useRef(new Animated.Value(1)).current;
+  const pulse = useSharedValue(1);
 
   useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, { toValue: 1.03, duration: 1400, useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 1, duration: 1400, useNativeDriver: true }),
-      ])
-    ).start();
-  }, []);
+    pulse.value = withRepeat(
+      withSequence(
+        withTiming(1.03, { duration: 1400 }),
+        withTiming(1, { duration: 1400 })
+      ),
+      -1,
+      false
+    );
+  }, [pulse]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pulse.value }],
+  }));
 
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.85}>
-      <Animated.View style={[styles.banner, { transform: [{ scale: pulse }] }]}>
+      <Animated.View style={[styles.banner, animatedStyle]}>
         <View style={styles.bannerIcon}>
           <Text style={{ fontSize: 22 }}>🎯</Text>
         </View>
@@ -203,19 +217,25 @@ function NicheSetBanner({ onPress }: { onPress: () => void }) {
 
 /** Shimmer placeholder card shown while loading */
 function SkeletonCard() {
-  const opacity = useRef(new Animated.Value(0.4)).current;
+  const opacity = useSharedValue(0.4);
 
   useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(opacity, { toValue: 0.9, duration: 800, useNativeDriver: true }),
-        Animated.timing(opacity, { toValue: 0.4, duration: 800, useNativeDriver: true }),
-      ])
-    ).start();
-  }, []);
+    opacity.value = withRepeat(
+      withSequence(
+        withTiming(0.9, { duration: 800 }),
+        withTiming(0.4, { duration: 800 })
+      ),
+      -1,
+      false
+    );
+  }, [opacity]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+  }));
 
   return (
-    <Animated.View style={[styles.card, { opacity }]}>
+    <Animated.View style={[styles.card, animatedStyle]}>
       <View style={styles.skeletonChip} />
       <View style={styles.skeletonImageBox} />
       <View style={styles.skeletonLine} />
@@ -227,23 +247,18 @@ function SkeletonCard() {
 
 /** Individual news card */
 function FeedCard({ article, index }: { article: NewsArticle; index: number }) {
-  const fade  = useRef(new Animated.Value(0)).current;
-  const slide = useRef(new Animated.Value(20)).current;
-  const scale = useRef(new Animated.Value(1)).current;
+  const scale = useSharedValue(1);
   // Flip to emoji fallback if the image URL fails to load
   const [imgError, setImgError] = useState(false);
 
-  useEffect(() => {
-    // Cap stagger delay so deep-list items don't wait forever
-    const cappedDelay = Math.min(index, 8) * 55;
-    Animated.parallel([
-      Animated.timing(fade,  { toValue: 1, duration: 350, delay: cappedDelay, useNativeDriver: true }),
-      Animated.spring(slide, { toValue: 0, tension: 60, friction: 9, delay: cappedDelay, useNativeDriver: true }),
-    ]).start();
-  }, []);
+  const cappedDelay = Math.min(index, 8) * 55;
 
-  const onPressIn  = () => Animated.spring(scale, { toValue: 0.97, useNativeDriver: true, tension: 300, friction: 10 }).start();
-  const onPressOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, tension: 200, friction: 8 }).start();
+  const onPressIn  = () => {
+    scale.value = withSpring(0.97, { damping: 15, stiffness: 200 });
+  };
+  const onPressOut = () => {
+    scale.value = withSpring(1, { damping: 15, stiffness: 150 });
+  };
 
   const handlePress = () => {
     if (article.url) Linking.openURL(article.url).catch(() => {});
@@ -251,8 +266,15 @@ function FeedCard({ article, index }: { article: NewsArticle; index: number }) {
 
   const showImage = article.image && !imgError;
 
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
   return (
-    <Animated.View style={{ opacity: fade, transform: [{ translateY: slide }, { scale }] }}>
+    <Animated.View
+      entering={FadeInDown.delay(cappedDelay).springify().damping(15).stiffness(150)}
+      style={animatedStyle}
+    >
       <TouchableOpacity
         activeOpacity={1}
         onPress={handlePress}
@@ -299,12 +321,20 @@ function FeedCard({ article, index }: { article: NewsArticle; index: number }) {
 
 /** Floating edit FAB */
 function EditFAB({ onPress }: { onPress: () => void }) {
-  const scale = useRef(new Animated.Value(1)).current;
-  const onPressIn  = () => Animated.spring(scale, { toValue: 0.9, useNativeDriver: true, tension: 300, friction: 10 }).start();
-  const onPressOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, tension: 200, friction: 8 }).start();
+  const scale = useSharedValue(1);
+  const onPressIn  = () => {
+    scale.value = withSpring(0.9, { damping: 10, stiffness: 300 });
+  };
+  const onPressOut = () => {
+    scale.value = withSpring(1, { damping: 8, stiffness: 200 });
+  };
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
 
   return (
-    <Animated.View style={[styles.fab, { transform: [{ scale }] }]}>
+    <Animated.View style={[styles.fab, animatedStyle]}>
       <TouchableOpacity
         onPress={onPress}
         onPressIn={onPressIn}
