@@ -149,20 +149,20 @@ export default function LandingScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="light-content" backgroundColor={C.background} />
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
       {/* ── Background glow blobs ──────────────────────────── */}
       <Animated.View
         style={[styles.blobTopLeft, {
           opacity: glowAnim.interpolate({ inputRange: [0,1], outputRange: [0.06, 0.15] }),
+          pointerEvents: 'none',
         }]}
-        pointerEvents="none"
       />
       <Animated.View
         style={[styles.blobBottomRight, {
           opacity: glowAnim.interpolate({ inputRange: [0,1], outputRange: [0.05, 0.12] }),
+          pointerEvents: 'none',
         }]}
-        pointerEvents="none"
       />
 
       <Animated.View style={[styles.container, { opacity: fadeAnim }]}>

@@ -7,7 +7,6 @@ import {
   Animated,
   Image,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
 
 export interface GroupCardItem {
   id: string;
@@ -154,7 +153,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.05)',
-    gap: 14,
     overflow: 'hidden',
     position: 'relative',
   },
@@ -168,7 +166,11 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   glow: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: 'rgba(150,249,150,0.04)',
     borderRadius: 20,
   },
@@ -181,6 +183,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexShrink: 0,
     position: 'relative',
+    overflow: 'hidden',
   },
   avatarActive: {
     borderWidth: 2,
@@ -192,14 +195,15 @@ const styles = StyleSheet.create({
     borderColor: '#ffb59c',
   },
   avatarImg: {
-    width: 52,
-    height: 52,
+    width: '100%',
+    height: '100%',
     borderRadius: 26,
   },
   avatarText: {
     fontSize: 20,
     fontWeight: '800',
     color: C.secondary,
+    includeFontPadding: false,
   },
   avatarTextRemoved: {
     color: '#ffb59c',
@@ -218,6 +222,7 @@ const styles = StyleSheet.create({
   info: {
     flex: 1,
     minWidth: 0,
+    marginLeft: 14,
   },
   row: {
     flexDirection: 'row',
@@ -231,6 +236,7 @@ const styles = StyleSheet.create({
     color: C.onSurface,
     flex: 1,
     paddingRight: 8,
+    includeFontPadding: false,
   },
   nameActive: {
     color: C.white,
@@ -239,6 +245,7 @@ const styles = StyleSheet.create({
   time: {
     fontSize: 12,
     color: C.onSurfaceVariant,
+    includeFontPadding: false,
   },
   timeActive: {
     color: C.primaryFixedDim,
@@ -249,6 +256,7 @@ const styles = StyleSheet.create({
     color: C.onSurfaceVariant,
     flex: 1,
     paddingRight: 8,
+    includeFontPadding: false,
   },
   previewActive: {
     color: C.onSurface,
@@ -267,6 +275,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '900',
     color: C.background,
+    includeFontPadding: false,
   },
   removedTag: {
     backgroundColor: 'rgba(255,181,156,0.15)',
@@ -279,5 +288,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#ffb59c',
     textTransform: 'uppercase',
+    includeFontPadding: false,
   },
 });

@@ -26,6 +26,18 @@ import { db } from '@/config/firebase';
 import { doc, setDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { randomUUID } from 'expo-crypto';
 
+function safeRandomUUID(): string {
+  try {
+    return randomUUID();
+  } catch {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === 'x' ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  }
+}
+
 const { width } = Dimensions.get('window');
 
 const C = {
@@ -145,7 +157,7 @@ export default function CreateGroupScreen() {
 
     setIsCreating(true);
     try {
-      const newGroupId = randomUUID();
+      const newGroupId = safeRandomUUID();
       const creatorProfile = useAuthStore.getState().user;
 
       // Step 1: Upload photo to Supabase if selected

@@ -95,7 +95,7 @@ function VortexBackground() {
   const scale2  = spin2.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 1.10, 1] });
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+    <View style={[StyleSheet.absoluteFill, { pointerEvents: 'none' }]}>
       {/* Layer 1 — matcha radial + conic tint */}
       <Animated.View
         style={[
@@ -209,7 +209,6 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="light-content" backgroundColor={C.background} />
 
       {/* ── Vortex spinning background ──────────────────────── */}
       <VortexBackground />

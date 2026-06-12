@@ -20,21 +20,28 @@ import {
   query,
   orderBy,
   onSnapshot,
-  getDocs,
-  limit,
   Timestamp,
+  doc,
+  deleteDoc,
   type Unsubscribe,
 } from 'firebase/firestore';
-import { db, auth } from '@/config/firebase';
+import { db } from '@/config/firebase';
 import {
   saveChatMeta,
   appendMessage,
   incrementUnread,
   getMessages,
+  getChatMeta,
+  deleteMessageLocally,
+  editMessageLocally,
+  markMessageAsDeletedLocally,
+  getMessagePreview,
   type StoredMessage,
 } from '@/services/chatStorage';
+import { router } from 'expo-router';
+import { useBannerStore } from '@/store/bannerStore';
 import { getActiveChatId } from '@/services/activeChat';
-import { markMessageDelivered } from '@/services/messageService';
+import { EDIT_DELETE_WINDOW_MS, downloadAndConsumeMediaMessage, deleteLocalMediaFile } from '@/services/messageService';
 
 import { useAuth } from '@/hooks/useAuth';
 
@@ -127,8 +134,34 @@ function attachChatListener(
       const data  = change.doc.data();
       const msgId = change.doc.id;
 
-      // Skip own messages
+      // Skip own messages/signals
       if (data.senderUid === currentUid) return;
+
+      // Handle Control Signals
+      if (data.type === 'DELETE_SIGNAL') {
+        const localMsgs = getMessages(chatId);
+        const target = localMsgs.find(m => m.id === data.targetMessageId);
+
+        if (target) {
+          if (target.type !== 'TEXT') {
+            deleteLocalMediaFile(target).catch(() => {});
+          }
+          markMessageAsDeletedLocally(chatId, data.targetMessageId);
+        }
+        deleteDoc(doc(db, 'chats', chatId, 'messages', msgId)).catch(() => {});
+        return;
+      }
+
+      if (data.type === 'EDIT_SIGNAL') {
+        const localMsgs = getMessages(chatId);
+        const target = localMsgs.find(m => m.id === data.targetMessageId);
+
+        if (target) {
+          editMessageLocally(chatId, data.targetMessageId, data.content);
+        }
+        deleteDoc(doc(db, 'chats', chatId, 'messages', msgId)).catch(() => {});
+        return;
+      }
 
       const createdAt = data.createdAt instanceof Timestamp
         ? data.createdAt.toMillis()
@@ -139,27 +172,64 @@ function attachChatListener(
         chatId,
         senderUid: data.senderUid,
         content:   data.content,
-        type:      (data.type as 'TEXT' | 'IMAGE') ?? 'TEXT',
+        type:      (data.type as any) ?? 'TEXT',
         status:    (data.status as StoredMessage['status']) ?? 'SENT',
         createdAt,
         isMine:    false,
+        fileName:  data.fileName || undefined,
+        fileSize:  data.fileSize || undefined,
+        mimeType:  data.mimeType || undefined,
       };
 
       // Check if we already have this message in MMKV
       const existing = getMessages(chatId);
       const alreadySaved = existing.some(m => m.id === msgId);
-      if (alreadySaved) return;
-
-      // Save to MMKV
-      appendMessage(msg);
-
-      // Increment unread only if user is NOT currently in this chat
-      if (getActiveChatId() !== chatId) {
-        incrementUnread(chatId);
+      if (alreadySaved) {
+        // Clean up document from Firestore if already processed
+        deleteDoc(doc(db, 'chats', chatId, 'messages', msgId)).catch(() => {});
+        return;
       }
 
-      // Auto-mark DELIVERED (tells sender their message arrived)
-      markMessageDelivered(chatId, msgId);
+      // Save to MMKV synchronously first (critical to prevent crash loss)
+      appendMessage(msg);
+
+      // Trigger background download and consumption of transit media
+      if (msg.type !== 'TEXT') {
+        downloadAndConsumeMediaMessage(chatId, msg).catch((err) => {
+          console.error('[useGlobalMessages] Background media download failed:', err);
+        });
+      }
+
+      // Immediately delete transit message document from Firestore
+      deleteDoc(doc(db, 'chats', chatId, 'messages', msgId)).catch(() => {});
+
+      // Increment unread and trigger In-App Banner only if user is NOT currently in this chat
+      if (getActiveChatId() !== chatId) {
+        incrementUnread(chatId);
+
+        // Retrieve partner info from local chat metadata cache
+        const meta = getChatMeta(chatId);
+        const partnerName = meta?.partnerName ?? 'Tea Friend';
+        const partnerPhoto = meta?.partnerPhoto ?? null;
+
+        // Trigger sliding In-App Banner alert overlay
+        useBannerStore.getState().showBanner(
+          partnerName,
+          getMessagePreview(msg),
+          partnerPhoto,
+          () => {
+            router.push({
+              pathname: '/chat/[id]',
+              params: {
+                id: msg.senderUid,
+                username: partnerName,
+                photoURL: partnerPhoto ?? 'null',
+                isOnline: 'true',
+              },
+            });
+          }
+        );
+      }
     });
   });
 

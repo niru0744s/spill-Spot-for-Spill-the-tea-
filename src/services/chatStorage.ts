@@ -28,10 +28,16 @@ export interface StoredMessage {
   senderName?: string;
   senderPhoto?: string | null;
   content: string;
-  type: 'TEXT' | 'IMAGE';
+  type: 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE' | 'DELETED';
   status: MessageStatus;
   createdAt: number;    // Unix ms
   isMine: boolean;      // shortcut: senderUid === currentUser.uid
+
+  // Media properties
+  localUri?: string;
+  fileName?: string;
+  fileSize?: number;
+  mimeType?: string;
 }
 
 export interface ChatMeta {
@@ -45,13 +51,13 @@ export interface ChatMeta {
   isBackedUp: boolean;
   isGroup?: boolean;
   status?: string;
+  partnerLastSeen?: number;
 }
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-const MAX_LOCAL_MESSAGES = 200;
 
 function msgsKey(chatId: string)     { return `msgs_${chatId}`; }
 function draftKey(chatId: string)    { return `draft_${chatId}`; }
@@ -130,7 +136,17 @@ export function getMessages(chatId: string): StoredMessage[] {
   return readJSON<StoredMessage[]>(msgsKey(chatId), []);
 }
 
-/** Append a new message. Caps at MAX_LOCAL_MESSAGES (drops oldest). */
+/** Get user-friendly text for chat preview based on message type */
+export function getMessagePreview(msg: StoredMessage): string {
+  if (msg.type === 'IMAGE') return '📷 Image';
+  if (msg.type === 'VIDEO') return '🎥 Video';
+  if (msg.type === 'AUDIO') return '🎙️ Voice Message';
+  if (msg.type === 'FILE') return `📄 ${msg.fileName || 'File'}`;
+  if (msg.type === 'DELETED') return '🚫 Message deleted';
+  return msg.content;
+}
+
+/** Append a new message without capping. */
 export function appendMessage(msg: StoredMessage): void {
   const messages = getMessages(msg.chatId);
 
@@ -143,22 +159,87 @@ export function appendMessage(msg: StoredMessage): void {
     messages.push(msg);
   }
 
-  // Cap to last MAX_LOCAL_MESSAGES
-  const capped = messages.length > MAX_LOCAL_MESSAGES
-    ? messages.slice(messages.length - MAX_LOCAL_MESSAGES)
-    : messages;
-
-  writeJSON(msgsKey(msg.chatId), capped);
+  writeJSON(msgsKey(msg.chatId), messages);
 
   // Update chat meta preview
   const meta = getChatMeta(msg.chatId);
   if (meta) {
     saveChatMeta({
       ...meta,
-      lastMessage: msg.content,
+      lastMessage: getMessagePreview(msg),
       lastMessageAt: msg.createdAt,
       isBackedUp: false,
     });
+  }
+}
+
+/** Edit a message locally in MMKV */
+export function editMessageLocally(chatId: string, messageId: string, newContent: string): void {
+  const messages = getMessages(chatId);
+  const idx = messages.findIndex(m => m.id === messageId);
+  if (idx !== -1) {
+    messages[idx].content = newContent;
+    writeJSON(msgsKey(chatId), messages);
+
+    // Update chat meta preview if this was the last message
+    if (idx === messages.length - 1) {
+      const meta = getChatMeta(chatId);
+      if (meta) {
+        saveChatMeta({
+          ...meta,
+          lastMessage: getMessagePreview(messages[idx]),
+          isBackedUp: false,
+        });
+      }
+    }
+  }
+}
+
+/** Delete a message locally in MMKV */
+export function deleteMessageLocally(chatId: string, messageId: string): void {
+  const messages = getMessages(chatId);
+  const filtered = messages.filter(m => m.id !== messageId);
+  writeJSON(msgsKey(chatId), filtered);
+
+  // Update chat meta preview if we deleted the last message
+  const meta = getChatMeta(chatId);
+  if (meta) {
+    const lastMsg = filtered[filtered.length - 1];
+    saveChatMeta({
+      ...meta,
+      lastMessage: lastMsg ? getMessagePreview(lastMsg) : '',
+      lastMessageAt: lastMsg ? lastMsg.createdAt : Date.now(),
+      isBackedUp: false,
+    });
+  }
+}
+
+/** Mark a message as deleted locally in MMKV */
+export function markMessageAsDeletedLocally(chatId: string, messageId: string): void {
+  const messages = getMessages(chatId);
+  const idx = messages.findIndex(m => m.id === messageId);
+  if (idx !== -1) {
+    messages[idx].type = 'DELETED';
+    messages[idx].content = 'Message deleted';
+    // Clear media properties
+    delete messages[idx].localUri;
+    delete messages[idx].fileName;
+    delete messages[idx].fileSize;
+    delete messages[idx].mimeType;
+
+    writeJSON(msgsKey(chatId), messages);
+
+    // Update chat meta preview if this was the last message
+    if (idx === messages.length - 1) {
+      const meta = getChatMeta(chatId);
+      if (meta) {
+        saveChatMeta({
+          ...meta,
+          lastMessage: getMessagePreview(messages[idx]),
+          isBackedUp: false,
+        });
+      }
+    }
   }
 }
 

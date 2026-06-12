@@ -20,8 +20,7 @@
       "softwareKeyboardLayoutMode": "resize",
       "predictiveBackGestureEnabled": false,
       "package": "com.anonymous.spill",
-      "googleServicesFile": "./google-services.json",
-      "usesCleartextTraffic": true
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "output": "static",
@@ -37,6 +36,16 @@
             "image": "./assets/images/splash-icon.png",
             "imageWidth": 76
           }
+        }
+      ],
+      "expo-sharing",
+      "expo-video",
+      "expo-image",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Allow Spill to access your microphone to record voice messages.",
+          "recordAudioAndroid": true
         }
       ]
     ],

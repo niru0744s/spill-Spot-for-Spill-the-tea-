@@ -11,7 +11,9 @@
 
 import { useAuth, useSessionListener } from "@/hooks/useAuth";
 import { useGlobalMessages } from "@/hooks/useGlobalMessages";
+import { usePresence } from "@/hooks/usePresence";
 import { registerForPushNotificationsAsync } from "@/services/notificationService";
+import { InAppBanner } from "@/components/InAppBanner";
 import * as Notifications from "expo-notifications";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { useEffect } from "react";
@@ -27,6 +29,9 @@ export default function RootLayout() {
 
   // 🌐 Global background message listener — runs for entire app session
   useGlobalMessages();
+
+  // 🟢 Online presence manager — monitors app state and internet connectivity
+  usePresence();
 
   // 🔔 Register for push notifications when user is authenticated
   useEffect(() => {
@@ -113,6 +118,7 @@ export default function RootLayout() {
           options={{ animation: 'slide_from_right' }}
         />
       </Stack>
+      <InAppBanner />
     </>
   );
 }

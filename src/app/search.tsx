@@ -27,6 +27,7 @@ import React, {
   useRef,
   useEffect,
   useCallback,
+  memo,
 } from 'react';
 import {
   View,
@@ -46,6 +47,8 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSearch } from '@/hooks/useSearch';
 import type { SearchUser } from '@/hooks/useSearch';
+import { isUserOnline, getMillis } from '@/services/presenceService';
+import { triggerSelection } from '@/services/hapticService';
 
 const { width, height } = Dimensions.get('window');
 
@@ -87,7 +90,7 @@ function AmbientOrbs() {
   }, []);
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+    <View style={[StyleSheet.absoluteFill, { pointerEvents: 'none' }]}>
       <Animated.View style={[styles.orb, styles.orb1, { transform: [{ translateX: orb1.x }, { translateY: orb1.y }] }]} />
       <Animated.View style={[styles.orb, styles.orb2, { transform: [{ translateX: orb2.x }, { translateY: orb2.y }] }]} />
       <Animated.View style={[styles.orb, styles.orb3, { transform: [{ translateX: orb3.x }, { translateY: orb3.y }] }]} />
@@ -180,7 +183,7 @@ function SearchBar({
 }
 
 /* ── User result card ──────────────────────────────────────── */
-function UserCard({ user, index }: { user: SearchUser; index: number }) {
+const UserCard = memo(function UserCard({ user, index }: { user: SearchUser; index: number }) {
   const slideAnim = useRef(new Animated.Value(24)).current;
   const fadeAnim  = useRef(new Animated.Value(0)).current;
 
@@ -202,15 +205,13 @@ function UserCard({ user, index }: { user: SearchUser; index: number }) {
     ]).start();
   }, []);
 
-  // isOnline comes directly from Firestore field
-  const isOnline = user.isOnline;
+  // isOnline is lease-checked based on Firestore fields
+  const isOnline = isUserOnline(user.lastSeen, user.isOnline);
 
   const lastSeenLabel = () => {
     if (!user.lastSeen) return null;
-    // Firestore Timestamp — convert to ms
-    const ms = typeof user.lastSeen === 'object' && 'toMillis' in user.lastSeen
-      ? (user.lastSeen as { toMillis: () => number }).toMillis()
-      : Date.now();
+    // Format timestamp using robust presenceService helper
+    const ms = getMillis(user.lastSeen);
     const diff  = Date.now() - ms;
     const mins  = Math.floor(diff / 60000);
     const hours = Math.floor(diff / 3600000);
@@ -223,6 +224,7 @@ function UserCard({ user, index }: { user: SearchUser; index: number }) {
   const router = useRouter();
 
   const handleStartChat = useCallback(() => {
+    triggerSelection(); // Selection haptic
     // Navigate directly to chat screen with the other user's UID.
     // The chat page will handle finding/creating the actual chat session.
     router.push({
@@ -231,10 +233,10 @@ function UserCard({ user, index }: { user: SearchUser; index: number }) {
         id: user.uid,
         username: user.displayName,
         photoURL: user.photoURL ?? 'null',
-        isOnline: String(user.isOnline),
+        isOnline: String(isOnline),
       },
     });
-  }, [user, router]);
+  }, [user, router, isOnline]);
 
   return (
     <Animated.View style={[styles.card, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
@@ -291,7 +293,17 @@ function UserCard({ user, index }: { user: SearchUser; index: number }) {
       </TouchableOpacity>
     </Animated.View>
   );
-}
+}, (prevProps, nextProps) => {
+  return (
+    prevProps.index === nextProps.index &&
+    prevProps.user.uid === nextProps.user.uid &&
+    prevProps.user.name === nextProps.user.name &&
+    prevProps.user.displayName === nextProps.user.displayName &&
+    prevProps.user.photoURL === nextProps.user.photoURL &&
+    prevProps.user.isOnline === nextProps.user.isOnline &&
+    prevProps.user.lastSeen === nextProps.user.lastSeen
+  );
+});
 
 /* ── Main Screen ───────────────────────────────────────────── */
 export default function SearchScreen() {
@@ -627,6 +639,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '800',
     color: C.primaryFixedDim,
+    includeFontPadding: false,
   },
   onlineDot: {
     position: 'absolute',
@@ -637,7 +650,7 @@ const styles = StyleSheet.create({
     borderRadius: 7,
     backgroundColor: C.primaryContainer,
     borderWidth: 2,
-    borderColor: C.background,
+    borderColor: '#1b211a',
     shadowColor: C.primaryContainer,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.9,
@@ -652,11 +665,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: C.white,
     letterSpacing: -0.2,
+    includeFontPadding: false,
   },
   cardUsername: {
     fontSize: 13,
     fontWeight: '400',
     color: C.onSurfaceVariant,
+    includeFontPadding: false,
   },
 
   /* Online/last seen badge */
@@ -667,12 +682,14 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     color: 'rgba(190,202,185,0.6)',
     textTransform: 'uppercase',
+    includeFontPadding: false,
   },
   cardBadgeTime: {
     fontSize: 10,
     fontWeight: '700',
     color: C.onSurfaceVariant,
     letterSpacing: 0.3,
+    includeFontPadding: false,
   },
   cardBadgeTimeOnline: {
     color: C.primaryFixedDim,
@@ -685,6 +702,7 @@ const styles = StyleSheet.create({
     color: C.onSurfaceVariant,
     fontStyle: 'italic',
     lineHeight: 20,
+    includeFontPadding: false,
   },
 
   /* CTA */
@@ -711,6 +729,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: C.onPrimaryContainer,
+    includeFontPadding: false,
   },
   ctaBtnTextOffline: {
     color: C.onSurfaceVariant,

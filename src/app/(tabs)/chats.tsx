@@ -28,10 +28,11 @@ import {
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useInbox, type InboxItem } from '@/hooks/useInbox';
 import { useAuth } from '@/hooks/useAuth';
-import { clearUnread } from '@/services/chatStorage';
+import { isUserOnline } from '@/services/presenceService';
+import { triggerSelection, triggerMediumImpact } from '@/services/hapticService';
 
 const { width } = Dimensions.get('window');
 
@@ -101,7 +102,7 @@ function OrbBackground() {
   );
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+    <View style={[StyleSheet.absoluteFill, { pointerEvents: 'none' }]}>
       {/* Orb 1 — matcha, top-left */}
       <Animated.View style={[styles.orb, styles.orb1, { transform: [{ translateX: orb1x }, { translateY: orb1y }] }]} />
       {/* Orb 2 — peach/secondary, bottom-right */}
@@ -155,7 +156,7 @@ function MyTeaBubble({ displayName, photoURL }: { displayName: string; photoURL:
 }
 
 /* ── Chat card ─────────────────────────────────────────────── */
-function ChatCard({ item, onPress, index }: { item: InboxItem; onPress: () => void; index: number }) {
+const ChatCard = React.memo(function ChatCard({ item, onPress, index }: { item: InboxItem; onPress: () => void; index: number }) {
   const fadeAnim  = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
 
@@ -175,7 +176,10 @@ function ChatCard({ item, onPress, index }: { item: InboxItem; onPress: () => vo
     <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
       <TouchableOpacity
         style={[styles.chatCard, hasUnread && styles.chatCardActive]}
-        onPress={onPress}
+        onPress={() => {
+          triggerSelection();
+          onPress();
+        }}
         activeOpacity={0.75}
       >
         {hasUnread && <View style={styles.chatCardGlow} />}
@@ -190,10 +194,10 @@ function ChatCard({ item, onPress, index }: { item: InboxItem; onPress: () => vo
             </Text>
           )}
           {/* Online dot */}
-          {item.partnerOnline && <View style={styles.onlineDot} />}
+          {isUserOnline(item.partnerLastSeen, item.partnerOnline) && <View style={styles.onlineDot} />}
         </View>
 
-        {/* Info */}
+        {/* Info Area */}
         <View style={styles.chatInfo}>
           <View style={styles.chatRow}>
             <Text style={[styles.chatName, hasUnread && styles.chatNameActive]} numberOfLines={1}>
@@ -203,23 +207,37 @@ function ChatCard({ item, onPress, index }: { item: InboxItem; onPress: () => vo
               {timeLabel}
             </Text>
           </View>
-          <Text style={[styles.chatPreview, hasUnread && styles.chatPreviewActive]} numberOfLines={1}>
-            {item.lastMessage || 'Say hello! 👋'}
-          </Text>
-        </View>
 
-        {/* Unread badge */}
-        {hasUnread && (
-          <View style={styles.unreadBadge}>
-            <Text style={styles.unreadBadgeText}>
-              {item.unreadCount > 99 ? '99+' : String(item.unreadCount)}
+          <View style={styles.chatRow}>
+            <Text style={[styles.chatPreview, hasUnread && styles.chatPreviewActive]} numberOfLines={1}>
+              {item.lastMessage || 'Say hello! 👋'}
             </Text>
+
+            {hasUnread && (
+              <View style={styles.unreadBadge}>
+                <Text style={styles.unreadBadgeText}>
+                  {item.unreadCount > 99 ? '99+' : String(item.unreadCount)}
+                </Text>
+              </View>
+            )}
           </View>
-        )}
+        </View>
       </TouchableOpacity>
     </Animated.View>
   );
-}
+}, (prevProps, nextProps) => {
+  return (
+    prevProps.index === nextProps.index &&
+    prevProps.item.chatId === nextProps.item.chatId &&
+    prevProps.item.lastMessage === nextProps.item.lastMessage &&
+    prevProps.item.lastMessageAt === nextProps.item.lastMessageAt &&
+    prevProps.item.partnerName === nextProps.item.partnerName &&
+    prevProps.item.partnerPhoto === nextProps.item.partnerPhoto &&
+    prevProps.item.partnerOnline === nextProps.item.partnerOnline &&
+    prevProps.item.partnerLastSeen === nextProps.item.partnerLastSeen &&
+    prevProps.item.unreadCount === nextProps.item.unreadCount
+  );
+});
 
 /** Format a Unix ms timestamp into a human-readable label */
 function formatTime(ms: number): string {
@@ -276,12 +294,11 @@ export default function ChatsScreen() {
   );
 
   const handleNewChat = useCallback(() => {
+    triggerMediumImpact();
     router.push('/search');
   }, [router]);
 
   const handleOpenChat = useCallback((item: InboxItem) => {
-    // Clear unread count when opening
-    clearUnread(item.chatId);
     refresh();
     router.push({
       pathname: '/chat/[id]',
@@ -300,10 +317,10 @@ export default function ChatsScreen() {
       {/* ── Orbital background ──────────────────────────────── */}
       <OrbBackground />
 
-      <SafeAreaView style={styles.safeArea}>
+      <View style={styles.safeArea}>
 
         {/* ── Top app bar ───────────────────────────────── */}
-        <View style={[styles.appBar, { paddingTop: insets.top + 8 }]}>
+        <View style={[styles.appBar, { paddingTop: insets.top + 12 }]}>
           <TouchableOpacity style={styles.appBarBtn} activeOpacity={0.7}>
             <MaterialIcons name="menu" size={24} color={C.onSurfaceVariant} />
           </TouchableOpacity>
@@ -361,7 +378,7 @@ export default function ChatsScreen() {
           <MaterialIcons name="edit-note" size={28} color={C.onPrimaryContainer} />
         </TouchableOpacity>
 
-      </SafeAreaView>
+      </View>
     </View>
   );
 }
@@ -550,7 +567,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.05)',
-    gap: 14,
     overflow: 'hidden',
     position: 'relative',
   },
@@ -576,24 +592,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: 'transparent',
   },
   chatAvatarActive: {
-    borderWidth: 2,
     borderColor: 'rgba(122,220,125,0.4)',
   },
   chatAvatarText: {
     fontSize: 20,
     fontWeight: '800',
     color: C.primaryFixedDim,
+    includeFontPadding: false,
   },
   chatInfo: {
     flex: 1,
     minWidth: 0,
+    marginLeft: 14,
+    justifyContent: 'center',
   },
   chatRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'baseline',
+    alignItems: 'center',
     marginBottom: 4,
   },
   chatName: {
@@ -601,6 +622,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: C.onSurface,
     flex: 1,
+    paddingRight: 8,
+    includeFontPadding: false,
   },
   chatNameActive: {
     color: C.white,
@@ -611,8 +634,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: C.onSurfaceVariant,
     letterSpacing: 0.3,
-    marginLeft: 8,
-    flexShrink: 0,
+    includeFontPadding: false,
   },
   chatTimeActive: {
     color: C.primaryContainer,
@@ -621,10 +643,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '400',
     color: C.onSurfaceVariant,
+    flex: 1,
+    paddingRight: 8,
+    includeFontPadding: false,
   },
   chatAvatarImg: {
-    width: 52,
-    height: 52,
+    width: '100%',
+    height: '100%',
     borderRadius: 26,
   },
   onlineDot: {
@@ -636,16 +661,16 @@ const styles = StyleSheet.create({
     borderRadius: 7,
     backgroundColor: '#96f996',
     borderWidth: 2,
-    borderColor: '#0f150e',
+    borderColor: C.surfaceContainer,
   },
   chatPreviewActive: {
     color: '#dfe4d9',
     fontWeight: '500',
   },
   unreadBadge: {
-    minWidth: 22,
-    height: 22,
-    borderRadius: 11,
+    height: 18,
+    minWidth: 18,
+    borderRadius: 9,
     backgroundColor: '#96f996',
     alignItems: 'center',
     justifyContent: 'center',
@@ -653,9 +678,10 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   unreadBadgeText: {
-    fontSize: 11,
-    fontWeight: '800',
+    fontSize: 10,
+    fontWeight: '900',
     color: '#002105',
+    includeFontPadding: false,
   },
   unreadDot: {
     width: 10,

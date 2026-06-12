@@ -22,8 +22,10 @@ import { auth, db } from '@/config/firebase';
 import { useRealtimeChat } from '@/hooks/useRealtimeChat';
 import { setActiveChatId } from '@/services/activeChat';
 import type { StoredMessage } from '@/services/chatStorage';
-import { buildChatId, clearDraft, getChatMeta, getDraft, saveChatMeta, saveDraft } from '@/services/chatStorage';
-import { sendMessage as sendMsg } from '@/services/messageService';
+import { buildChatId, clearDraft, getChatMeta, getDraft, saveChatMeta, saveDraft, editMessageLocally, deleteMessageLocally, markMessageAsDeletedLocally } from '@/services/chatStorage';
+import { sendMessage as sendMsg, sendEditSignal, sendDeleteSignal, EDIT_DELETE_WINDOW_MS, sendMediaMessage, deleteLocalMediaFile } from '@/services/messageService';
+import { getMillis, isUserOnline, getPresenceLabel } from '@/services/presenceService';
+import { triggerMediumImpact, triggerHeavyImpact, triggerSuccessNotification, triggerSelection } from '@/services/hapticService';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
@@ -32,25 +34,38 @@ import {
   useEffect,
   useRef,
   useState,
+  memo,
 } from 'react';
 import {
   ActivityIndicator,
   Animated,
-  Dimensions,
   Easing,
   FlatList,
-  Image,
+  TouchableOpacity,
+  View,
+  Modal,
+  Text,
+  TextInput,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+  Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-const { width } = Dimensions.get('window');
+import { Image as ExpoImage } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
+import { File } from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import {
+  useAudioPlayer,
+  useAudioPlayerStatus,
+  useAudioRecorder,
+  RecordingPresets,
+  requestRecordingPermissionsAsync,
+  setAudioModeAsync,
+} from 'expo-audio';
+import { useVideoPlayer, VideoView } from 'expo-video';
 
 /* ── Design tokens ─────────────────────────────────── */
 const C = {
@@ -68,6 +83,22 @@ const C = {
   outlineVariant:          '#3f4a3d',
   errorColor:              '#ff6b6b',
   white:                   '#ffffff',
+};
+
+const getMessageTime = (msg: StoredMessage | null | undefined): number => {
+  if (!msg) return Date.now();
+  const t = msg.createdAt;
+  if (typeof t === 'number') return t;
+  if (typeof t === 'string') return new Date(t).getTime();
+  if (t && typeof t === 'object') {
+    if ('toMillis' in t && typeof (t as any).toMillis === 'function') {
+      return (t as any).toMillis();
+    }
+    if ('seconds' in t) {
+      return (t as any).seconds * 1000;
+    }
+  }
+  return Date.now();
 };
 
 /* ── Typing indicator dots ─────────────────────────── */
@@ -129,13 +160,124 @@ function StatusTick({ status }: { status: StoredMessage['status'] }) {
   );
 }
 
+/* ── Audio player component inside bubble ────────────── */
+const AudioPlayerBubbleInner = memo(function AudioPlayerBubbleInner({
+  localUri,
+  isMine,
+  status,
+}: {
+  localUri: string;
+  isMine: boolean;
+  status: string;
+}) {
+  const audioSource = Platform.OS === 'android' && localUri.startsWith('file://')
+    ? localUri.replace('file://', '')
+    : localUri;
+
+  const [fileSizeLabel, setFileSizeLabel] = useState<string>('...');
+
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      setFileSizeLabel('Web');
+      return;
+    }
+    try {
+      const file = new File(localUri);
+      if (!file.exists) {
+        setFileSizeLabel('Missing');
+      } else {
+        setFileSizeLabel(`${(file.size / 1024).toFixed(1)}KB`);
+      }
+    } catch {
+      setFileSizeLabel('Err');
+    }
+  }, [localUri]);
+
+  const player = useAudioPlayer(audioSource);
+  const playerStatus = useAudioPlayerStatus(player);
+
+  const isPlaying = playerStatus.playing;
+  const duration = playerStatus.duration; // in seconds
+  const currentTime = playerStatus.currentTime; // in seconds
+
+  const handlePlayPause = async () => {
+    try {
+      if (isPlaying) {
+        player.pause();
+      } else {
+        if (duration && currentTime >= duration) {
+          await player.seekTo(0);
+        }
+        player.play();
+      }
+    } catch (err) {
+      console.error('[AudioPlayerBubble] Playback error:', err);
+    }
+  };
+
+  const formatAudioTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
+
+  const progressPct = duration ? (currentTime / duration) * 100 : 0;
+
+  return (
+    <View style={styles.audioBubble}>
+      <TouchableOpacity onPress={handlePlayPause} style={styles.audioPlayBtn} activeOpacity={0.85}>
+        <MaterialIcons name={isPlaying ? 'pause' : 'play-arrow'} size={20} color={C.onPrimaryFixed} />
+      </TouchableOpacity>
+      <View style={styles.audioTrackWrap}>
+        <View style={styles.audioProgressBarBg}>
+          <View style={[styles.audioProgressBar, { width: `${progressPct}%` }]} />
+        </View>
+        <Text style={styles.audioTimeText}>
+          {formatAudioTime(currentTime)} / {duration ? formatAudioTime(duration) : '0:00'} ({fileSizeLabel})
+        </Text>
+      </View>
+    </View>
+  );
+});
+
+const AudioPlayerBubble = memo(function AudioPlayerBubble({
+  localUri,
+  isMine,
+  status,
+}: {
+  localUri?: string;
+  isMine: boolean;
+  status: string;
+}) {
+  if (!localUri) {
+    return (
+      <View style={styles.audioBubble}>
+        <ActivityIndicator size="small" color={C.onSurfaceVariant} />
+        <Text style={styles.mediaPlaceholderText}>Loading audio...</Text>
+      </View>
+    );
+  }
+
+  return <AudioPlayerBubbleInner localUri={localUri} isMine={isMine} status={status} />;
+});
+
 /* ── Message bubble ─────────────────────────────────── */
-function MessageBubble({
+const MessageBubble = memo(function MessageBubble({
   item,
   prevItem,
+  onLongPress,
+  setLightboxUri,
+  setLightboxVisible,
+  setVideoPlayerUri,
+  setVideoModalVisible,
 }: {
   item: StoredMessage;
   prevItem?: StoredMessage;
+  onLongPress?: () => void;
+  setLightboxUri: (uri: string | null) => void;
+  setLightboxVisible: (visible: boolean) => void;
+  setVideoPlayerUri: (uri: string | null) => void;
+  setVideoModalVisible: (visible: boolean) => void;
 }) {
   const isGrouped = prevItem &&
     prevItem.isMine === item.isMine &&
@@ -146,27 +288,150 @@ function MessageBubble({
     minute: '2-digit',
   });
 
+  const handleMediaPress = () => {
+    if (item.type === 'IMAGE' && item.localUri) {
+      setLightboxUri(item.localUri);
+      setLightboxVisible(true);
+    } else if (item.type === 'VIDEO' && item.localUri) {
+      setVideoPlayerUri(item.localUri);
+      setVideoModalVisible(true);
+    } else if (item.type === 'FILE' && item.localUri) {
+      Sharing.shareAsync(item.localUri).catch(err => console.error('[MessageBubble] Share failed:', err));
+    }
+  };
+
+  const renderBubbleContent = () => {
+    const isMine = item.isMine;
+
+    if (item.type === 'DELETED') {
+      return (
+        <View style={styles.deletedBubble}>
+          <MaterialIcons name="block" size={16} color={C.onSurfaceVariant} style={{ marginRight: 6 }} />
+          <Text style={styles.deletedText}>
+            {item.isMine ? 'You deleted this message' : 'This message was deleted'}
+          </Text>
+        </View>
+      );
+    }
+
+    if (item.type === 'IMAGE') {
+      return (
+        <View style={styles.imageBubbleWrap}>
+          {item.localUri ? (
+            <ExpoImage source={{ uri: item.localUri }} style={styles.imageBubble} contentFit="cover" />
+          ) : (
+            <View style={styles.mediaPlaceholder}>
+              <ActivityIndicator size="small" color={C.primaryFixedDim} />
+              <Text style={styles.mediaPlaceholderText}>Loading photo...</Text>
+            </View>
+          )}
+          {item.status === 'SENDING' && (
+            <View style={styles.uploadProgressOverlay}>
+              <ActivityIndicator size="small" color={C.white} />
+            </View>
+          )}
+        </View>
+      );
+    }
+
+    if (item.type === 'VIDEO') {
+      return (
+        <View style={styles.videoBubbleWrap}>
+          {item.localUri ? (
+            <View style={{ position: 'relative', width: '100%', height: '100%' }}>
+              <View style={styles.videoThumbnailPlaceholder}>
+                <MaterialIcons name="videocam" size={28} color={C.onSurfaceVariant} />
+                <Text style={styles.mediaPlaceholderText}>Tap to play video</Text>
+              </View>
+              <View style={styles.videoPlayOverlay}>
+                <MaterialIcons name="play-circle-outline" size={44} color={C.white} />
+              </View>
+            </View>
+          ) : (
+            <View style={styles.mediaPlaceholder}>
+              <ActivityIndicator size="small" color={C.primaryFixedDim} />
+              <Text style={styles.mediaPlaceholderText}>Loading video...</Text>
+            </View>
+          )}
+          {item.status === 'SENDING' && (
+            <View style={styles.uploadProgressOverlay}>
+              <ActivityIndicator size="small" color={C.white} />
+            </View>
+          )}
+        </View>
+      );
+    }
+
+    if (item.type === 'AUDIO') {
+      return (
+        <AudioPlayerBubble localUri={item.localUri} isMine={isMine} status={item.status} />
+      );
+    }
+
+    if (item.type === 'FILE') {
+      const sizeMB = item.fileSize ? (item.fileSize / (1024 * 1024)).toFixed(1) : '?';
+      return (
+        <View style={styles.fileBubble}>
+          <View style={styles.fileIconBg}>
+            <MaterialIcons name="insert-drive-file" size={20} color={C.onPrimaryFixed} />
+          </View>
+          <View style={styles.fileMeta}>
+            <Text style={[styles.fileNameText, isMine ? { color: C.onPrimaryFixed } : { color: C.onSurface }]} numberOfLines={1}>
+              {item.fileName || 'Document'}
+            </Text>
+            <Text style={styles.fileSizeText}>
+              {sizeMB} MB • File
+            </Text>
+          </View>
+          {(!item.localUri && item.status !== 'SENDING') ? (
+            <ActivityIndicator size="small" color={C.primaryFixedDim} style={{ marginLeft: 8 }} />
+          ) : item.status === 'SENDING' ? (
+            <ActivityIndicator size="small" color={C.white} style={{ marginLeft: 8 }} />
+          ) : (
+            <MaterialIcons name="open-in-new" size={16} color={isMine ? C.onPrimaryFixed : C.onSurfaceVariant} style={{ marginLeft: 8 }} />
+          )}
+        </View>
+      );
+    }
+
+    return (
+      <Text style={[styles.bubbleText, isMine ? styles.bubbleTextOut : styles.bubbleTextIn]}>
+        {item.content}
+      </Text>
+    );
+  };
+
+  const isMedia = item.type !== 'TEXT';
+
   return (
     <View style={[
       styles.bubbleRow,
       item.isMine ? styles.bubbleRowOut : styles.bubbleRowIn,
       isGrouped ? styles.bubbleGrouped : styles.bubbleFirst,
     ]}>
-      <View style={[
-        styles.bubble,
-        item.isMine ? styles.bubbleOut : styles.bubbleIn,
-        item.isMine ? styles.bubbleOutCorner : styles.bubbleInCorner,
-      ]}>
-        <Text style={[styles.bubbleText, item.isMine ? styles.bubbleTextOut : styles.bubbleTextIn]}>
-          {item.content}
-        </Text>
-      </View>
+      <TouchableOpacity
+        activeOpacity={0.85}
+        onPress={isMedia && item.type !== 'DELETED' ? handleMediaPress : undefined}
+        onLongPress={onLongPress}
+        delayLongPress={400}
+        style={[
+          styles.bubble,
+          item.type === 'DELETED'
+            ? { backgroundColor: 'rgba(255, 255, 255, 0.04)', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.05)', paddingHorizontal: 12, paddingVertical: 8 }
+            : isMedia
+              ? { padding: 4 }
+              : (item.isMine ? styles.bubbleOut : styles.bubbleIn),
+          item.isMine ? styles.bubbleOutCorner : styles.bubbleInCorner,
+        ]}
+      >
+        {renderBubbleContent()}
+      </TouchableOpacity>
 
       {/* Outgoing: time + tick */}
       {item.isMine && (
         <View style={styles.metaRow}>
           <Text style={styles.metaTime}>{timeLabel}</Text>
-          <StatusTick status={item.status} />
+          {item.type !== 'DELETED' && <StatusTick status={item.status} />}
         </View>
       )}
       {/* Incoming: time only on last in group */}
@@ -175,7 +440,16 @@ function MessageBubble({
       )}
     </View>
   );
-}
+}, (prevProps, nextProps) => {
+  return (
+    prevProps.item.id === nextProps.item.id &&
+    prevProps.item.content === nextProps.item.content &&
+    prevProps.item.status === nextProps.item.status &&
+    prevProps.item.localUri === nextProps.item.localUri &&
+    prevProps.prevItem?.id === nextProps.prevItem?.id &&
+    prevProps.prevItem?.createdAt === nextProps.prevItem?.createdAt
+  );
+});
 
 /* ── Offline banner ─────────────────────────────────── */
 function OfflineBanner() {
@@ -187,45 +461,30 @@ function OfflineBanner() {
   );
 }
 
-/* ── Premium Skeleton Loader ────────────────────────── */
-function ChatSkeleton() {
-  const shimmerAnim = useRef(new Animated.Value(0.3)).current;
 
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(shimmerAnim, {
-          toValue: 0.7,
-          duration: 800,
-          useNativeDriver: true,
-        }),
-        Animated.timing(shimmerAnim, {
-          toValue: 0.3,
-          duration: 800,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-  }, []);
+
+function VideoPlayerModal({ uri, visible, onClose }: { uri: string | null; visible: boolean; onClose: () => void }) {
+  const player = useVideoPlayer(uri || '', (player) => {
+    player.loop = true;
+    if (uri) {
+      player.play();
+    }
+  });
+
+  if (!uri) return null;
 
   return (
-    <View style={styles.skeletonContainer}>
-      <Animated.View style={[styles.skeletonRow, styles.skeletonRowIn, { opacity: shimmerAnim }]}>
-        <View style={[styles.skeletonBubble, styles.skeletonBubbleIn, { width: 120 }]} />
-      </Animated.View>
-
-      <Animated.View style={[styles.skeletonRow, styles.skeletonRowOut, { opacity: shimmerAnim }]}>
-        <View style={[styles.skeletonBubble, styles.skeletonBubbleOut, { width: 180 }]} />
-      </Animated.View>
-
-      <Animated.View style={[styles.skeletonRow, styles.skeletonRowIn, { opacity: shimmerAnim }]}>
-        <View style={[styles.skeletonBubble, styles.skeletonBubbleIn, { width: 90 }]} />
-      </Animated.View>
-
-      <Animated.View style={[styles.skeletonRow, styles.skeletonRowOut, { opacity: shimmerAnim }]}>
-        <View style={[styles.skeletonBubble, styles.skeletonBubbleOut, { width: 140 }]} />
-      </Animated.View>
-    </View>
+    <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={onClose}>
+      <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
+        <VideoView player={player} style={{ width: '100%', height: '80%' }} nativeControls />
+        <TouchableOpacity 
+          style={{ position: 'absolute', top: 50, right: 20, width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' }} 
+          onPress={onClose}
+        >
+          <MaterialIcons name="close" size={24} color="#fff" />
+        </TouchableOpacity>
+      </View>
+    </Modal>
   );
 }
 
@@ -240,7 +499,8 @@ export default function ChatRoomScreen() {
     isOnline: string;
   }>();
 
-  const partnerUid  = params.id;
+  const rawId = params.id as string;
+  const partnerUid = rawId && rawId.includes('?') ? rawId.split('?')[0] : rawId;
   const username    = params.username ?? 'Tea Friend';
   const photoURL    = params.photoURL && params.photoURL !== 'null' ? params.photoURL : null;
   const isOnline    = params.isOnline === 'true';
@@ -252,16 +512,11 @@ export default function ChatRoomScreen() {
   const [partnerOnline, setPartnerOnline] = useState(isOnline);
   const [partnerPhotoURL, setPartnerPhotoURL] = useState<string | null>(photoURL);
   const [partnerActiveChatId, setPartnerActiveChatId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Premium quick-load transition when entering a chat
-  useEffect(() => {
-    setIsLoading(true);
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 600);
-    return () => clearTimeout(timer);
-  }, [chatId]);
+  const [partnerLastSeen, setPartnerLastSeen] = useState<number>(() => {
+    const meta = getChatMeta(chatId);
+    return meta?.partnerLastSeen ?? Date.now();
+  });
+  const [presenceLabel, setPresenceLabel] = useState<string>('Offline');
 
   // Sync partner online status & photoURL in real-time & update local chat metadata cache
   useEffect(() => {
@@ -273,10 +528,12 @@ export default function ChatRoomScreen() {
         const online = !!data.isOnline;
         const activeChat = data.activeChatId ?? null;
         const livePhoto = data.photoURL && data.photoURL !== 'null' ? data.photoURL : null;
+        const lastSeenMs = data.lastSeen ? getMillis(data.lastSeen) : Date.now();
         
         setPartnerOnline(online);
         setPartnerPhotoURL(livePhoto);
         setPartnerActiveChatId(activeChat);
+        setPartnerLastSeen(lastSeenMs);
 
         // Update local metadata cache reactively
         const existingMeta = getChatMeta(chatId);
@@ -285,6 +542,7 @@ export default function ChatRoomScreen() {
             ...existingMeta,
             partnerOnline: online,
             partnerPhoto: livePhoto,
+            partnerLastSeen: lastSeenMs,
           });
         }
       }
@@ -305,19 +563,461 @@ export default function ChatRoomScreen() {
       lastMessage: existing?.lastMessage ?? '',
       lastMessageAt: existing?.lastMessageAt ?? Date.now(),
       isBackedUp: existing?.isBackedUp ?? false,
+      partnerLastSeen: partnerLastSeen,
     });
-  }, [chatId, partnerPhotoURL, partnerOnline]);
+  }, [chatId, partnerPhotoURL, partnerOnline, partnerLastSeen, currentUid, partnerUid, username]);
 
   const {
     messages,
     isOtherTyping,
     isOnline: networkOnline,
     appendLocalMessage,
-    updateLocalStatus,
+    editLocalMessageState,
+    deleteLocalMessageState,
+    markLocalMessageAsDeletedState,
     markAsRead,
     notifyTyping,
     stopTyping,
   } = useRealtimeChat(chatId);
+
+  const [selectedMessage, setSelectedMessage] = useState<StoredMessage | null>(null);
+  const [optionsModalVisible, setOptionsModalVisible] = useState(false);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editText, setEditText] = useState('');
+
+  // Media & Modal States
+  const [attachmentModalVisible, setAttachmentModalVisible] = useState(false);
+  const [lightboxVisible, setLightboxVisible] = useState(false);
+  const [lightboxUri, setLightboxUri] = useState<string | null>(null);
+  const [videoModalVisible, setVideoModalVisible] = useState(false);
+  const [videoPlayerUri, setVideoPlayerUri] = useState<string | null>(null);
+
+  // Audio Recording States
+  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const recordingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+    };
+  }, []);
+
+  const formatRecordingTime = (secs: number) => {
+    const mins = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${mins}:${s < 10 ? '0' : ''}${s}`;
+  };
+
+  // Attachment Picker & Sending Callbacks
+  const handlePickMedia = async () => {
+    setAttachmentModalVisible(false);
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permissionResult.granted) {
+        alert('Permission to access camera roll is required!');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.All,
+        quality: 0.8,
+        allowsEditing: false,
+      });
+
+      if (result.canceled || !result.assets || result.assets.length === 0) return;
+
+      const asset = result.assets[0];
+      const localUri = asset.uri;
+      const type: 'IMAGE' | 'VIDEO' = asset.type === 'video' ? 'VIDEO' : 'IMAGE';
+      const fileName = asset.fileName || `${Date.now()}.${type === 'VIDEO' ? 'mp4' : 'jpg'}`;
+      const mimeType = type === 'VIDEO' ? 'video/mp4' : 'image/jpeg';
+
+      let fileSize = 0;
+      if (Platform.OS === 'web') {
+        fileSize = asset.fileSize || (asset as any).size || 0;
+        if (!fileSize) {
+          try {
+            const res = await fetch(localUri);
+            const blob = await res.blob();
+            fileSize = blob.size;
+          } catch (e) {
+            console.warn('Failed to fetch media size on web:', e);
+          }
+        }
+      } else {
+        const file = new File(localUri);
+        if (!file.exists) return;
+        fileSize = file.size;
+      }
+
+      if (fileSize > 30 * 1024 * 1024) {
+        alert('File size exceeds the 30MB limit.');
+        return;
+      }
+
+      triggerMediumImpact();
+      const msg = await sendMediaMessage({
+        chatId,
+        senderUid: currentUid,
+        localUri,
+        type,
+        fileName,
+        fileSize,
+        mimeType,
+        partnerMeta: {
+          partnerUid,
+          partnerName: username,
+          partnerPhoto: photoURL,
+          partnerOnline: isOnline,
+        },
+      });
+      appendLocalMessage(msg);
+    } catch (error) {
+      console.error('Error picking media:', error);
+      alert('Failed to send media.');
+    }
+  };
+
+  const handleTakeCamera = async () => {
+    setAttachmentModalVisible(false);
+    try {
+      const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permissionResult.granted) {
+        alert('Permission to access camera is required!');
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.All,
+        quality: 0.8,
+      });
+
+      if (result.canceled || !result.assets || result.assets.length === 0) return;
+
+      const asset = result.assets[0];
+      const localUri = asset.uri;
+      const type: 'IMAGE' | 'VIDEO' = asset.type === 'video' ? 'VIDEO' : 'IMAGE';
+      const fileName = asset.fileName || `${Date.now()}.${type === 'VIDEO' ? 'mp4' : 'jpg'}`;
+      const mimeType = type === 'VIDEO' ? 'video/mp4' : 'image/jpeg';
+
+      let fileSize = 0;
+      if (Platform.OS === 'web') {
+        fileSize = asset.fileSize || (asset as any).size || 0;
+        if (!fileSize) {
+          try {
+            const res = await fetch(localUri);
+            const blob = await res.blob();
+            fileSize = blob.size;
+          } catch (e) {
+            console.warn('Failed to fetch camera capture size on web:', e);
+          }
+        }
+      } else {
+        const file = new File(localUri);
+        if (!file.exists) return;
+        fileSize = file.size;
+      }
+
+      if (fileSize > 30 * 1024 * 1024) {
+        alert('File size exceeds the 30MB limit.');
+        return;
+      }
+
+      triggerMediumImpact();
+      const msg = await sendMediaMessage({
+        chatId,
+        senderUid: currentUid,
+        localUri,
+        type,
+        fileName,
+        fileSize,
+        mimeType,
+        partnerMeta: {
+          partnerUid,
+          partnerName: username,
+          partnerPhoto: photoURL,
+          partnerOnline: isOnline,
+        },
+      });
+      appendLocalMessage(msg);
+    } catch (error) {
+      console.error('Error taking camera photo/video:', error);
+      alert('Failed to capture media.');
+    }
+  };
+
+  const handlePickDocument = async () => {
+    setAttachmentModalVisible(false);
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: '*/*',
+        copyToCacheDirectory: true,
+      });
+
+      if (result.canceled || !result.assets || result.assets.length === 0) return;
+
+      const asset = result.assets[0];
+      const localUri = asset.uri;
+      const fileName = asset.name;
+      const fileSize = asset.size ?? 0;
+      const mimeType = asset.mimeType ?? 'application/octet-stream';
+
+      if (fileSize > 30 * 1024 * 1024) {
+        alert('File size exceeds the 30MB limit.');
+        return;
+      }
+
+      triggerMediumImpact();
+      const msg = await sendMediaMessage({
+        chatId,
+        senderUid: currentUid,
+        localUri,
+        type: 'FILE',
+        fileName,
+        fileSize,
+        mimeType,
+        partnerMeta: {
+          partnerUid,
+          partnerName: username,
+          partnerPhoto: photoURL,
+          partnerOnline: isOnline,
+        },
+      });
+      appendLocalMessage(msg);
+    } catch (error) {
+      console.error('Error picking document:', error);
+      alert('Failed to send file.');
+    }
+  };
+
+  const startRecording = async () => {
+    setAttachmentModalVisible(false);
+    try {
+      const permissionResult = await requestRecordingPermissionsAsync();
+      if (!permissionResult.granted) {
+        alert('Permission to access microphone is required!');
+        return;
+      }
+
+      await setAudioModeAsync({
+        allowsRecording: true,
+        playsInSilentMode: true,
+      });
+
+      await audioRecorder.prepareToRecordAsync();
+      audioRecorder.record();
+
+      setIsRecording(true);
+      setRecordingDuration(0);
+      triggerSelection();
+
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingDuration(prev => prev + 1);
+      }, 1000);
+    } catch (error) {
+      console.error('Failed to start recording:', error);
+      alert('Failed to start audio recording.');
+    }
+  };
+
+  const stopRecordingAndSend = async () => {
+    setIsRecording(false);
+    if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+    triggerSelection();
+
+    try {
+      await audioRecorder.stop();
+      const uri = audioRecorder.uri;
+      if (!uri) return;
+
+      let fileSize = 0;
+      let fileName = `voice_${Date.now()}.m4a`;
+      let mimeType = 'audio/x-m4a';
+
+      if (Platform.OS === 'web') {
+        const res = await fetch(uri);
+        const blob = await res.blob();
+        fileSize = blob.size;
+        mimeType = blob.type || 'audio/webm';
+        
+        let ext = 'webm';
+        if (mimeType.includes('mp4') || mimeType.includes('m4a') || mimeType.includes('aac')) {
+          ext = 'm4a';
+        } else if (mimeType.includes('ogg')) {
+          ext = 'ogg';
+        } else if (mimeType.includes('wav')) {
+          ext = 'wav';
+        }
+        fileName = `voice_${Date.now()}.${ext}`;
+      } else {
+        const file = new File(uri);
+        if (!file.exists) return;
+        fileSize = file.size;
+      }
+
+      if (fileSize > 30 * 1024 * 1024) {
+        alert('Recording size exceeds 30MB.');
+        return;
+      }
+
+      const msg = await sendMediaMessage({
+        chatId,
+        senderUid: currentUid,
+        localUri: uri,
+        type: 'AUDIO',
+        fileName,
+        fileSize,
+        mimeType,
+        partnerMeta: {
+          partnerUid,
+          partnerName: username,
+          partnerPhoto: photoURL,
+          partnerOnline: isOnline,
+        },
+      });
+      appendLocalMessage(msg);
+    } catch (error) {
+      console.error('Failed to stop recording:', error);
+      alert('Failed to save voice recording.');
+    }
+  };
+
+  const cancelRecording = async () => {
+    setIsRecording(false);
+    if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+    triggerSelection();
+    try {
+      await audioRecorder.stop();
+    } catch {}
+  };
+
+  const handleMessageLongPress = useCallback((msg: StoredMessage) => {
+    triggerHeavyImpact(); // Heavy pop for message options
+    setSelectedMessage(msg);
+    setOptionsModalVisible(true);
+  }, []);
+
+  const handleDeleteForMe = useCallback(() => {
+    if (!selectedMessage) return;
+    const msgId = selectedMessage.id;
+    const msgType = selectedMessage.type;
+    const localUri = selectedMessage.localUri;
+    
+    triggerSuccessNotification(); // Success vibration
+    setOptionsModalVisible(false);
+    setSelectedMessage(null);
+
+    if (msgType === 'DELETED') {
+      // Permanently remove already deleted message
+      deleteMessageLocally(chatId, msgId);
+      deleteLocalMessageState(msgId);
+    } else {
+      // 1. Mark as deleted locally in MMKV
+      markMessageAsDeletedLocally(chatId, msgId);
+      // 2. Mark as deleted in local state
+      markLocalMessageAsDeletedState(msgId);
+      // 3. Clean up local media files
+      if (msgType !== 'TEXT') {
+        deleteLocalMediaFile({ id: msgId, type: msgType, localUri } as any).catch(() => {});
+      }
+    }
+  }, [selectedMessage, chatId, deleteLocalMessageState, markLocalMessageAsDeletedState]);
+
+  const handleDeleteForEveryone = useCallback(async () => {
+    if (!selectedMessage) return;
+    const msgId = selectedMessage.id;
+    triggerSuccessNotification(); // Success vibration
+    setOptionsModalVisible(false);
+
+    // Safety check: verify within window
+    const isWithinWindow = Date.now() - getMessageTime(selectedMessage) < EDIT_DELETE_WINDOW_MS;
+    if (!isWithinWindow || !selectedMessage.isMine) {
+      // Fallback: just delete for me (by marking as deleted)
+      markMessageAsDeletedLocally(chatId, msgId);
+      markLocalMessageAsDeletedState(msgId);
+      if (selectedMessage.type !== 'TEXT') {
+        deleteLocalMediaFile(selectedMessage).catch(() => {});
+      }
+      setSelectedMessage(null);
+      return;
+    }
+
+    const fileName = selectedMessage.fileName;
+    const msgType = selectedMessage.type;
+    const localUri = selectedMessage.localUri;
+    setSelectedMessage(null);
+
+    // 1. Mark as deleted locally in MMKV
+    markMessageAsDeletedLocally(chatId, msgId);
+    // 2. Mark as deleted in local state
+    markLocalMessageAsDeletedState(msgId);
+    // 3. Clean up local media files
+    if (msgType !== 'TEXT') {
+      deleteLocalMediaFile({ id: msgId, type: msgType, localUri } as any).catch(() => {});
+    }
+    // 4. Send delete signal to partner
+    await sendDeleteSignal(chatId, msgId, partnerUid, fileName);
+  }, [selectedMessage, chatId, partnerUid, markLocalMessageAsDeletedState]);
+
+  const handleStartEdit = useCallback(() => {
+    if (!selectedMessage) return;
+    
+    // Safety check: verify within window
+    const isWithinWindow = Date.now() - getMessageTime(selectedMessage) < EDIT_DELETE_WINDOW_MS;
+    if (!isWithinWindow || !selectedMessage.isMine) return;
+
+    triggerSelection(); // Selection haptic
+    setEditText(selectedMessage.content);
+    setOptionsModalVisible(false);
+    setEditModalVisible(true);
+  }, [selectedMessage]);
+
+  const handleSaveEdit = useCallback(async () => {
+    if (!selectedMessage) return;
+    const msgId = selectedMessage.id;
+    const newText = editText.trim();
+    if (!newText) return;
+
+    // Safety check: verify within window
+    const isWithinWindow = Date.now() - getMessageTime(selectedMessage) < EDIT_DELETE_WINDOW_MS;
+    if (!isWithinWindow || !selectedMessage.isMine) {
+      setEditModalVisible(false);
+      setSelectedMessage(null);
+      setEditText('');
+      return;
+    }
+
+    triggerSuccessNotification(); // Success vibration
+    setEditModalVisible(false);
+    setSelectedMessage(null);
+    setEditText('');
+
+    // 1. Edit locally in MMKV
+    editMessageLocally(chatId, msgId, newText);
+    // 2. Update local state
+    editLocalMessageState(msgId, newText);
+    // 3. Send edit signal to partner
+    await sendEditSignal(chatId, msgId, newText, partnerUid);
+  }, [selectedMessage, editText, chatId, partnerUid, editLocalMessageState]);
+
+  // Dynamic presence label countdown logic
+  useEffect(() => {
+    const updateLabel = () => {
+      if (isOtherTyping) {
+        setPresenceLabel('typing...');
+      } else {
+        const label = getPresenceLabel(partnerLastSeen, partnerOnline, partnerActiveChatId, chatId);
+        setPresenceLabel(label);
+      }
+    };
+
+    updateLabel();
+
+    const interval = setInterval(updateLabel, 30 * 1000); // refresh time-ago label every 30s
+    return () => clearInterval(interval);
+  }, [isOtherTyping, partnerLastSeen, partnerOnline, partnerActiveChatId, chatId]);
 
   // Tell the global listener and Firestore that this chat is actively open
   useEffect(() => {
@@ -335,7 +1035,7 @@ export default function ChatRoomScreen() {
   }, [chatId, currentUid]);
 
   // Mark partner messages as READ whenever this screen is active
-  useEffect(() => { markAsRead(); }, [chatId]);
+  useEffect(() => { markAsRead(); }, [chatId, markAsRead]);
   useFocusEffect(useCallback(() => { markAsRead(); }, [markAsRead]));
 
   const [inputText, setInputText]     = useState(() => getDraft(chatId));
@@ -366,6 +1066,7 @@ export default function ChatRoomScreen() {
     const text = inputText.trim();
     if (!text || !currentUid) return;
 
+    triggerMediumImpact(); // Slightly heavier kick feedback on message send
     setInputText('');
     setInputHeight(44);
     clearDraft(chatId);
@@ -395,7 +1096,17 @@ export default function ChatRoomScreen() {
   const renderItem = ({ item, index }: { item: StoredMessage; index: number }) => {
     // In a reversed array, the chronological "previous" message is at index + 1
     const prevItem = index < reversedMessages.length - 1 ? reversedMessages[index + 1] : undefined;
-    return <MessageBubble item={item} prevItem={prevItem} />;
+    return (
+      <MessageBubble
+        item={item}
+        prevItem={prevItem}
+        onLongPress={() => handleMessageLongPress(item)}
+        setLightboxUri={setLightboxUri}
+        setLightboxVisible={setLightboxVisible}
+        setVideoPlayerUri={setVideoPlayerUri}
+        setVideoModalVisible={setVideoModalVisible}
+      />
+    );
   };
 
   return (
@@ -427,18 +1138,12 @@ export default function ChatRoomScreen() {
                 <Text style={styles.headerAvatarInitial}>{getInitial(username)}</Text>
               </View>
             )}
-            {partnerOnline && <View style={styles.headerOnlineDot} />}
+            {isUserOnline(partnerLastSeen, partnerOnline) && <View style={styles.headerOnlineDot} />}
           </View>
           <View>
             <Text style={styles.headerName}>{username}</Text>
-            <Text style={[styles.headerStatus, partnerOnline && styles.headerStatusOnline]}>
-              {isOtherTyping
-                ? 'typing...'
-                : partnerOnline
-                ? partnerActiveChatId === chatId
-                  ? 'on chat'
-                  : 'Active now'
-                : 'Offline'}
+            <Text style={[styles.headerStatus, isUserOnline(partnerLastSeen, partnerOnline) && styles.headerStatusOnline]}>
+              {presenceLabel}
             </Text>
           </View>
         </TouchableOpacity>
@@ -454,28 +1159,28 @@ export default function ChatRoomScreen() {
       </View>
 
       {/* ── Messages ─────────────────────────────────── */}
-      {/* {isLoading ? (
-        <ChatSkeleton />
-      ) : ( */}
-        <FlatList
-          ref={flatListRef}
-          data={reversedMessages}
-          inverted
-          keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          ListFooterComponent={<DateDivider label="TODAY" />}
-          ListHeaderComponent={isOtherTyping ? <TypingIndicator /> : null}
-          contentContainerStyle={[
-            styles.messageList,
-            { paddingVertical: 16 },
-          ]}
-          showsVerticalScrollIndicator={false}
-        />
-      {/* )} */}
+      <FlatList
+        ref={flatListRef}
+        data={reversedMessages}
+        inverted
+        keyExtractor={(item) => item.id}
+        renderItem={renderItem}
+        initialNumToRender={20}
+        maxToRenderPerBatch={10}
+        windowSize={11}
+        removeClippedSubviews={Platform.OS === 'android'}
+        ListFooterComponent={<DateDivider label="TODAY" />}
+        ListHeaderComponent={isOtherTyping ? <TypingIndicator /> : null}
+        contentContainerStyle={[
+          styles.messageList,
+          { paddingVertical: 16 },
+        ]}
+        showsVerticalScrollIndicator={false}
+      />
 
       {/* ── Input bar ────────────────────────────────── */}
       <View style={[styles.inputBar, { paddingBottom: insets.bottom + 10 }]}>
-          <TouchableOpacity style={styles.inputIconBtn} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.inputIconBtn} activeOpacity={0.7} onPress={() => setAttachmentModalVisible(true)}>
             <MaterialIcons name="add-circle-outline" size={26} color={C.onSurfaceVariant} />
           </TouchableOpacity>
 
@@ -510,6 +1215,236 @@ export default function ChatRoomScreen() {
             />
           </TouchableOpacity>
       </View>
+
+      {/* ── Message Options Modal (Bottom Sheet style) ── */}
+      <Modal
+        visible={optionsModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setOptionsModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setOptionsModalVisible(false)}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeaderLine} />
+            <Text style={styles.modalTitle}>Message Options</Text>
+            
+            {selectedMessage && selectedMessage.isMine && selectedMessage.type === 'TEXT' && (Date.now() - getMessageTime(selectedMessage) < EDIT_DELETE_WINDOW_MS) && (
+              <TouchableOpacity
+                style={styles.modalOption}
+                onPress={handleStartEdit}
+                activeOpacity={0.7}
+              >
+                <MaterialIcons name="edit" size={20} color={C.onSurface} />
+                <Text style={styles.modalOptionText}>Edit Message</Text>
+              </TouchableOpacity>
+            )}
+
+            {selectedMessage && selectedMessage.isMine && selectedMessage.type !== 'DELETED' && (Date.now() - getMessageTime(selectedMessage) < EDIT_DELETE_WINDOW_MS) && (
+              <TouchableOpacity
+                style={styles.modalOption}
+                onPress={handleDeleteForEveryone}
+                activeOpacity={0.7}
+              >
+                <MaterialIcons name="delete-sweep" size={20} color={C.errorColor} />
+                <Text style={[styles.modalOptionText, { color: C.errorColor }]}>
+                  Delete for Everyone
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              style={styles.modalOption}
+              onPress={handleDeleteForMe}
+              activeOpacity={0.7}
+            >
+              <MaterialIcons name="delete" size={20} color={C.errorColor} />
+              <Text style={[styles.modalOptionText, { color: C.errorColor }]}>
+                {selectedMessage?.type === 'DELETED' ? 'Delete' : 'Delete for Me'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.modalOption, styles.modalCancelOption]}
+              onPress={() => setOptionsModalVisible(false)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.modalCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* ── Edit Message Modal ── */}
+      <Modal
+        visible={editModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setEditModalVisible(false);
+          setSelectedMessage(null);
+        }}
+      >
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => {
+              setEditModalVisible(false);
+              setSelectedMessage(null);
+            }}
+          >
+            <View style={[styles.modalContent, styles.editModalContent]} onStartShouldSetResponder={() => true}>
+              <Text style={styles.modalTitle}>Edit Message</Text>
+              
+              <View style={styles.editInputPill}>
+                <TextInput
+                  style={styles.editTextInput}
+                  value={editText}
+                  onChangeText={setEditText}
+                  multiline
+                  autoFocus
+                  placeholder="Edit your message..."
+                  placeholderTextColor="rgba(190,202,185,0.45)"
+                />
+              </View>
+
+              <View style={styles.editActionsRow}>
+                <TouchableOpacity
+                  style={[styles.editBtn, styles.editCancelBtn]}
+                  onPress={() => {
+                    setEditModalVisible(false);
+                    setSelectedMessage(null);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.editCancelBtnText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.editBtn, styles.editSaveBtn, !editText.trim() && styles.editSaveBtnDisabled]}
+                  onPress={handleSaveEdit}
+                  disabled={!editText.trim()}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.editSaveBtnText}>Save</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ── Attachment Sheet Modal ── */}
+      <Modal
+        visible={attachmentModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setAttachmentModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setAttachmentModalVisible(false)}
+        >
+          <View style={styles.attachmentModalContent}>
+            <View style={styles.attachmentModalHeader}>
+              <Text style={styles.attachmentModalTitle}>Share Media</Text>
+              <TouchableOpacity onPress={() => setAttachmentModalVisible(false)}>
+                <MaterialIcons name="close" size={22} color={C.onSurfaceVariant} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.attachmentOptionsGrid}>
+              <TouchableOpacity style={styles.attachmentOptionBtn} onPress={handleTakeCamera} activeOpacity={0.75}>
+                <View style={styles.attachmentOptionIconBg}>
+                  <MaterialIcons name="photo-camera" size={26} color={C.primaryFixedDim} />
+                </View>
+                <Text style={styles.attachmentOptionLabel}>Camera</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.attachmentOptionBtn} onPress={handlePickMedia} activeOpacity={0.75}>
+                <View style={styles.attachmentOptionIconBg}>
+                  <MaterialIcons name="image" size={26} color={C.primaryFixedDim} />
+                </View>
+                <Text style={styles.attachmentOptionLabel}>Gallery</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.attachmentOptionBtn} onPress={handlePickDocument} activeOpacity={0.75}>
+                <View style={styles.attachmentOptionIconBg}>
+                  <MaterialIcons name="insert-drive-file" size={26} color={C.primaryFixedDim} />
+                </View>
+                <Text style={styles.attachmentOptionLabel}>Document</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.attachmentOptionBtn} onPress={startRecording} activeOpacity={0.75}>
+                <View style={styles.attachmentOptionIconBg}>
+                  <MaterialIcons name="mic" size={26} color={C.primaryFixedDim} />
+                </View>
+                <Text style={styles.attachmentOptionLabel}>Voice Note</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* ── Image Lightbox Modal ── */}
+      <Modal
+        visible={lightboxVisible}
+        transparent={false}
+        animationType="fade"
+        onRequestClose={() => setLightboxVisible(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
+          {lightboxUri && (
+            <ExpoImage
+              source={{ uri: lightboxUri }}
+              style={{ width: '100%', height: '100%' }}
+              contentFit="contain"
+            />
+          )}
+          <TouchableOpacity
+            style={{ position: 'absolute', top: 50, right: 20, width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' }}
+            onPress={() => setLightboxVisible(false)}
+          >
+            <MaterialIcons name="close" size={24} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      </Modal>
+
+      {/* ── Video Player Modal ── */}
+      <VideoPlayerModal
+        uri={videoPlayerUri}
+        visible={videoModalVisible}
+        onClose={() => {
+          setVideoModalVisible(false);
+          setVideoPlayerUri(null);
+        }}
+      />
+
+      {/* ── Voice Recording Floating Bar ── */}
+      {isRecording && (
+        <View style={[styles.recordingBar, { height: 74 + insets.bottom, paddingBottom: insets.bottom + 6 }]}>
+          <View style={styles.recordingTimerWrap}>
+            <View style={styles.recordingIndicatorDot} />
+            <Text style={styles.recordingTimerText}>Recording... {formatRecordingTime(recordingDuration)}</Text>
+          </View>
+          <View style={styles.recordingActions}>
+            <TouchableOpacity onPress={cancelRecording} style={styles.recordingCancelBtn} activeOpacity={0.7}>
+              <Text style={styles.recordingCancelText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={stopRecordingAndSend} style={styles.recordingSendBtn} activeOpacity={0.8}>
+              <MaterialIcons name="mic-off" size={20} color={C.white} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
     </KeyboardAvoidingView>
   );
@@ -567,6 +1502,9 @@ const styles = StyleSheet.create({
   bubbleTextIn:            { color: C.onSurface },
   bubbleTextOut:           { color: C.onPrimaryFixed },
 
+  deletedBubble:           { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 4, paddingVertical: 2 },
+  deletedText:             { fontSize: 15, fontStyle: 'italic', color: C.onSurfaceVariant, fontWeight: '400' },
+
   metaRow:                 { flexDirection: 'row', alignItems: 'center', marginTop: 4, marginRight: 4 },
   metaTime:                { fontSize: 10, fontWeight: '600', color: C.onSurfaceVariant, letterSpacing: 0.3 },
   metaTimeIn:              { fontSize: 10, fontWeight: '600', color: C.onSurfaceVariant, letterSpacing: 0.3, marginTop: 4, marginLeft: 4, marginBottom: 4 },
@@ -614,5 +1552,350 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 4,
     borderWidth: 1,
     borderColor: 'rgba(150, 249, 150, 0.25)',
+  },
+
+  // Modal styling
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15,21,14,0.75)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: C.surfaceContainerHigh,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+    paddingTop: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
+  modalHeaderLine: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: C.outlineVariant,
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: C.onSurface,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  modalOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
+    gap: 12,
+  },
+  modalOptionText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: C.onSurface,
+  },
+  modalCancelOption: {
+    borderBottomWidth: 0,
+    justifyContent: 'center',
+    marginTop: 8,
+  },
+  modalCancelText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: C.onSurfaceVariant,
+  },
+  editModalContent: {
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    borderRadius: 24,
+    marginHorizontal: 16,
+    marginBottom: 'auto',
+    marginTop: 'auto',
+    justifyContent: 'center',
+  },
+  editInputPill: {
+    backgroundColor: C.surfaceContainerHighest,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: C.outlineVariant,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    minHeight: 60,
+    maxHeight: 120,
+    marginBottom: 16,
+  },
+  editTextInput: {
+    fontSize: 16,
+    fontWeight: '400',
+    color: C.onSurface,
+    textAlignVertical: 'top',
+  },
+  editActionsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'flex-end',
+  },
+  editBtn: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  editCancelBtn: {
+    backgroundColor: 'transparent',
+  },
+  editCancelBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: C.onSurfaceVariant,
+  },
+  editSaveBtn: {
+    backgroundColor: C.primaryContainer,
+  },
+  editSaveBtnDisabled: {
+    opacity: 0.5,
+  },
+  editSaveBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: C.onPrimaryContainer,
+  },
+  
+  /* ── Media bubbles ──────────────────────────────────── */
+  imageBubbleWrap: {
+    width: 220,
+    height: 160,
+    borderRadius: 14,
+    overflow: 'hidden',
+    backgroundColor: C.surfaceContainerHigh,
+  },
+  imageBubble: {
+    width: '100%',
+    height: '100%',
+  },
+  videoBubbleWrap: {
+    width: 220,
+    height: 140,
+    borderRadius: 14,
+    overflow: 'hidden',
+    backgroundColor: C.surfaceContainerHigh,
+  },
+  videoThumbnailPlaceholder: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  videoPlayOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.25)',
+  },
+  mediaPlaceholder: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    padding: 20,
+  },
+  mediaPlaceholderText: {
+    fontSize: 12,
+    color: C.onSurfaceVariant,
+  },
+  uploadProgressOverlay: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fileBubble: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    backgroundColor: 'rgba(150,249,150,0.08)',
+    borderRadius: 12,
+    maxWidth: 220,
+  },
+  fileIconBg: {
+    width: 38,
+    height: 38,
+    borderRadius: 8,
+    backgroundColor: C.primaryFixedDim,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fileMeta: {
+    flex: 1,
+    marginLeft: 10,
+    justifyContent: 'center',
+    minWidth: 0,
+  },
+  fileNameText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: C.onSurface,
+  },
+  fileSizeText: {
+    fontSize: 11,
+    color: C.onSurfaceVariant,
+    marginTop: 2,
+  },
+  audioBubble: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    gap: 12,
+    width: 200,
+  },
+  audioPlayBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: C.primaryFixedDim,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  audioTrackWrap: {
+    flex: 1,
+    gap: 6,
+  },
+  audioProgressBarBg: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(150,249,150,0.15)',
+    width: '100%',
+    overflow: 'hidden',
+  },
+  audioProgressBar: {
+    height: '100%',
+    backgroundColor: C.primaryFixedDim,
+  },
+  audioTimeText: {
+    fontSize: 10,
+    color: C.onSurfaceVariant,
+  },
+  
+  /* ── Attachment Sheet styles ────────────────────────── */
+  attachmentModalContainer: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  attachmentModalContent: {
+    backgroundColor: C.surfaceContainer,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: 24,
+    gap: 20,
+    borderTopWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
+  attachmentModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  attachmentModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: C.white,
+  },
+  attachmentOptionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 16,
+    justifyContent: 'space-between',
+    marginVertical: 12,
+  },
+  attachmentOptionBtn: {
+    width: '22%',
+    alignItems: 'center',
+    gap: 8,
+  },
+  attachmentOptionIconBg: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: C.surfaceContainerHigh,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
+  attachmentOptionLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: C.onSurface,
+    textAlign: 'center',
+  },
+  
+  /* ── Voice Recording overlay ────────────────────────── */
+  recordingBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: C.surfaceContainer,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    borderTopWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
+  recordingTimerWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  recordingIndicatorDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: C.errorColor,
+  },
+  recordingTimerText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: C.white,
+  },
+  recordingActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  recordingCancelBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  recordingCancelText: {
+    color: C.onSurfaceVariant,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  recordingSendBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: C.errorColor,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
