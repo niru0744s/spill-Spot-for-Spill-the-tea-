@@ -62,14 +62,17 @@ function createWebStorage(): StorageAdapter {
 }
 
 // ---------------------------------------------------------------------------
-// Native adapter — wraps MMKV, falls back to in-memory if init fails
+// Platform-safe storage adapter creator
 // ---------------------------------------------------------------------------
-function createNativeStorage(): StorageAdapter {
+export function createStorageAdapter(id: string): StorageAdapter {
+  if (Platform.OS === 'web') {
+    return createWebStorage();
+  }
   try {
     // Dynamic require so web bundler never touches this code path
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { createMMKV } = require('react-native-mmkv') as typeof import('react-native-mmkv');
-    const mmkv = createMMKV({ id: 'spill-chat-storage' });
+    const mmkv = createMMKV({ id });
     // Wrap to normalise API: StorageAdapter uses remove(), MMKV v4 also uses remove() ✅
     return {
       set:        (k, v) => mmkv.set(k, v),
@@ -80,7 +83,7 @@ function createNativeStorage(): StorageAdapter {
       addOnValueChangedListener: (cb) => mmkv.addOnValueChangedListener(cb),
     };
   } catch (e) {
-    console.warn('[storage] MMKV init failed, falling back to in-memory store:', e);
+    console.warn(`[storage] MMKV init failed for ${id}, falling back to in-memory store:`, e);
     return createInMemoryStorage();
   }
 }
@@ -103,7 +106,7 @@ function createInMemoryStorage(): StorageAdapter {
 }
 
 // ---------------------------------------------------------------------------
-// Export the right adapter for the current platform
+// Export the right adapters for the current platform
 // ---------------------------------------------------------------------------
-export const storage: StorageAdapter =
-  Platform.OS === 'web' ? createWebStorage() : createNativeStorage();
+export const storage: StorageAdapter = createStorageAdapter('spill-chat-storage');
+export const authStorage: StorageAdapter = createStorageAdapter('firebase-auth-persistence');
