@@ -255,6 +255,7 @@ export default function GroupSettingsScreen() {
         const updatedMembers = { ...(groupDetails?.members ?? {}) };
         if (updatedMembers[userId]) {
           updatedMembers[userId].status = 'REMOVED';
+          updatedMembers[userId].isAdmin = false;
         }
         await updateDoc(groupRef, {
           members: updatedMembers,
