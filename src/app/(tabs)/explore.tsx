@@ -273,48 +273,49 @@ function FeedCard({ article, index }: { article: NewsArticle; index: number }) {
   return (
     <Animated.View
       entering={FadeInDown.delay(cappedDelay).springify().damping(15).stiffness(150)}
-      style={animatedStyle}
     >
-      <TouchableOpacity
-        activeOpacity={1}
-        onPress={handlePress}
-        onPressIn={onPressIn}
-        onPressOut={onPressOut}
-        style={styles.card}
-      >
-        {/* Niche chip */}
-        <View style={styles.nicheChip}>
-          <Text style={styles.nicheChipEmoji}>{article.nicheEmoji}</Text>
-          <Text style={styles.nicheChipLabel}>{article.niche.toUpperCase()}</Text>
-        </View>
-
-        {/* Thumbnail — falls back to emoji if URL fails or is null */}
-        {showImage ? (
-          <Image
-            source={{ uri: article.image! }}
-            style={styles.cardImage}
-            resizeMode="cover"
-            onError={() => setImgError(true)}
-          />
-        ) : (
-          <View style={styles.cardImageFallback}>
-            <Text style={{ fontSize: 36 }}>{article.nicheEmoji}</Text>
+      <Animated.View style={animatedStyle}>
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={handlePress}
+          onPressIn={onPressIn}
+          onPressOut={onPressOut}
+          style={styles.card}
+        >
+          {/* Niche chip */}
+          <View style={styles.nicheChip}>
+            <Text style={styles.nicheChipEmoji}>{article.nicheEmoji}</Text>
+            <Text style={styles.nicheChipLabel}>{article.niche.toUpperCase()}</Text>
           </View>
-        )}
 
-        {/* Headline */}
-        <Text style={styles.cardTitle} numberOfLines={2}>
-          {article.title}
-        </Text>
+          {/* Thumbnail — falls back to emoji if URL fails or is null */}
+          {showImage ? (
+            <Image
+              source={{ uri: article.image! }}
+              style={styles.cardImage}
+              resizeMode="cover"
+              onError={() => setImgError(true)}
+            />
+          ) : (
+            <View style={styles.cardImageFallback}>
+              <Text style={{ fontSize: 36 }}>{article.nicheEmoji}</Text>
+            </View>
+          )}
 
-        {/* Footer */}
-        <View style={styles.cardFooter}>
-          <Text style={styles.cardSource} numberOfLines={1}>
-            {article.source}
+          {/* Headline */}
+          <Text style={styles.cardTitle} numberOfLines={2}>
+            {article.title}
           </Text>
-          <Text style={styles.cardTime}>{timeAgo(article.publishedAt)}</Text>
-        </View>
-      </TouchableOpacity>
+
+          {/* Footer */}
+          <View style={styles.cardFooter}>
+            <Text style={styles.cardSource} numberOfLines={1}>
+              {article.source}
+            </Text>
+            <Text style={styles.cardTime}>{timeAgo(article.publishedAt)}</Text>
+          </View>
+        </TouchableOpacity>
+      </Animated.View>
     </Animated.View>
   );
 }
