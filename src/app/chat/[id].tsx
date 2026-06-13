@@ -26,6 +26,7 @@ import { buildChatId, clearDraft, getChatMeta, getDraft, saveChatMeta, saveDraft
 import { sendMessage as sendMsg, sendEditSignal, sendDeleteSignal, EDIT_DELETE_WINDOW_MS, sendMediaMessage, deleteLocalMediaFile } from '@/services/messageService';
 import { getMillis, isUserOnline, getPresenceLabel } from '@/services/presenceService';
 import { triggerMediumImpact, triggerHeavyImpact, triggerSuccessNotification, triggerSelection } from '@/services/hapticService';
+import { initiateCall } from '@/services/callService';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
@@ -1149,7 +1150,18 @@ export default function ChatRoomScreen() {
         </TouchableOpacity>
 
         <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.headerIconBtn} activeOpacity={0.7}>
+          <TouchableOpacity
+            style={styles.headerIconBtn}
+            activeOpacity={0.7}
+            onPress={() => initiateCall(partnerUid, username, partnerPhotoURL, 'voice')}
+          >
+            <MaterialIcons name="call" size={22} color={C.onSurfaceVariant} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.headerIconBtn}
+            activeOpacity={0.7}
+            onPress={() => initiateCall(partnerUid, username, partnerPhotoURL, 'video')}
+          >
             <MaterialIcons name="videocam" size={22} color={C.onSurfaceVariant} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.headerIconBtn} activeOpacity={0.7}>

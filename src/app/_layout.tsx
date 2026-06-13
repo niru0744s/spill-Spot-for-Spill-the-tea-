@@ -9,11 +9,15 @@
  * auth and non-auth screens on cold start).
  */
 
+import "@/errorHandler";
 import { useAuth, useSessionListener } from "@/hooks/useAuth";
 import { useGlobalMessages } from "@/hooks/useGlobalMessages";
 import { usePresence } from "@/hooks/usePresence";
 import { registerForPushNotificationsAsync } from "@/services/notificationService";
 import { InAppBanner } from "@/components/InAppBanner";
+import { CallScreen } from "@/components/CallScreen";
+import { useCallStore, type CallType } from "@/store/useCallStore";
+import { listenForIncomingCalls, startActiveCallListener } from "@/services/callService";
 import * as Notifications from "expo-notifications";
 import { Stack, useRouter, useSegments, useRootNavigationState } from "expo-router";
 import { useEffect } from "react";
@@ -41,10 +45,27 @@ export default function RootLayout() {
     }
   }, [firebaseUser]);
 
-  // 🔔 Listen for push notification taps and route to chat
+  // 🔔 Listen for push notification taps and route to chat/call
   useEffect(() => {
     const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
       const data = response.notification.request.content.data;
+
+      // Handle incoming call notification taps
+      if (data?.type === 'CALL_INCOMING' && data.callId) {
+        useCallStore.getState().setCallActive({
+          callId: String(data.callId),
+          partnerUid: String(data.callerUid || ''),
+          partnerName: String(data.callerName || 'Someone'),
+          partnerPhoto: data.callerPhoto ? String(data.callerPhoto) : null,
+          type: (data.callType as CallType) || 'voice',
+          isIncoming: true,
+          channelName: String(data.channelName || ''),
+          agoraToken: String(data.agoraToken || ''),
+        });
+        startActiveCallListener(String(data.callId));
+        return;
+      }
+
       const partnerUid = data?.senderUid ? String(data.senderUid) : '';
       const username = data?.senderName ? String(data.senderName) : 'Tea Friend';
       const photoURL = data?.partnerPhoto ? String(data.partnerPhoto) : 'null';
@@ -65,6 +86,17 @@ export default function RootLayout() {
 
     return () => subscription.remove();
   }, [router]);
+
+  // 📞 Listen for incoming calls in real-time when authenticated
+  useEffect(() => {
+    if (!firebaseUser) return;
+
+    const unsubscribe = listenForIncomingCalls(firebaseUser.uid, (callId) => {
+      console.log('[RootLayout] Incoming call signaling registered:', callId);
+    });
+
+    return () => unsubscribe();
+  }, [firebaseUser]);
 
   useEffect(() => {
     if (!isInitialized) return;
@@ -116,6 +148,7 @@ export default function RootLayout() {
         />
       </Stack>
       <InAppBanner />
+      <CallScreen />
     </>
   );
 }

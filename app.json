@@ -8,7 +8,11 @@
     "scheme": "spill",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Allow Spill to access your camera for video calls.",
+        "NSMicrophoneUsageDescription": "Allow Spill to access your microphone for voice calls."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -20,7 +24,12 @@
       "softwareKeyboardLayoutMode": "resize",
       "predictiveBackGestureEnabled": false,
       "package": "com.anonymous.spill",
-      "googleServicesFile": "./google-services.json"
+      "googleServicesFile": "./google-services.json",
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.CAMERA",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
     },
     "web": {
       "output": "static",
@@ -47,7 +56,8 @@
           "microphonePermission": "Allow Spill to access your microphone to record voice messages.",
           "recordAudioAndroid": true
         }
-      ]
+      ],
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true,
