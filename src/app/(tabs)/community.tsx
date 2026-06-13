@@ -250,7 +250,7 @@ function getStyles(C: ThemeColors, isDark: boolean) {
   headerTitle: {
     fontSize: 32,
     fontWeight: '800',
-    color: C.white,
+    color: C.onSurface,
     letterSpacing: -0.5,
   },
   headerBtn: {

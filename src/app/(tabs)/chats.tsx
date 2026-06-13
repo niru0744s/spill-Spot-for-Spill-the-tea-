@@ -427,9 +427,9 @@ const getStyles = (C: ThemeColors, isDark: boolean) => StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 12,
-    backgroundColor: 'rgba(15,21,14,0.7)',
+    backgroundColor: isDark ? 'rgba(15,21,14,0.7)' : 'rgba(244,250,243,0.85)',
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(63,74,61,0.3)',
+    borderBottomColor: C.cardBorder,
   },
   appBarBtn: {
     width: 40,

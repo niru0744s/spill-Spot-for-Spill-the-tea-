@@ -668,8 +668,8 @@ function getStyles(C: ThemeColors, isDark: boolean) {
     paddingTop: Platform.OS === 'android' ? 12 : 8,
     paddingBottom: 14,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(63,74,61,0.4)',
-    backgroundColor: 'rgba(15,21,14,0.92)',
+    borderBottomColor: C.cardBorder,
+    backgroundColor: isDark ? 'rgba(15,21,14,0.92)' : 'rgba(244,250,243,0.92)',
   },
   headerLeft: { flex: 1, gap: 8 },
   headerTitle: {

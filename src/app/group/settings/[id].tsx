@@ -920,7 +920,7 @@ function getStyles(C: ThemeColors, isDark: boolean) {
     /* ── Modal Styles ────────────────────────────────────────── */
     modalOverlay: {
       flex: 1,
-      backgroundColor: 'rgba(15,21,14,0.9)',
+      backgroundColor: isDark ? 'rgba(15,21,14,0.9)' : 'rgba(0,0,0,0.5)',
       justifyContent: 'flex-end',
     },
     modalContent: {
@@ -935,7 +935,7 @@ function getStyles(C: ThemeColors, isDark: boolean) {
       alignItems: 'center',
       padding: 18,
       borderBottomWidth: 1,
-      borderColor: 'rgba(255,255,255,0.03)',
+      borderColor: C.cardBorder,
     },
     modalTitle: {
       fontSize: 18,
