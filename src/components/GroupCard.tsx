@@ -231,7 +231,7 @@ const getStyles = (C: ThemeColors, isDark: boolean) => StyleSheet.create({
     includeFontPadding: false,
   },
   nameActive: {
-    color: C.white,
+    color: isDark ? C.white : C.onSurface,
     fontWeight: '800',
   },
   time: {

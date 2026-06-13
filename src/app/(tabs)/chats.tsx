@@ -561,17 +561,17 @@ const getStyles = (C: ThemeColors, isDark: boolean) => StyleSheet.create({
     marginHorizontal: 20,
     marginBottom: 10,
     padding: 14,
-    backgroundColor: 'rgba(27,33,26,0.65)',
+    backgroundColor: C.cardBg,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    borderColor: C.cardBorder,
     overflow: 'hidden',
     position: 'relative',
   },
   chatCardActive: {
-    backgroundColor: 'rgba(38,43,36,0.85)',
-    borderColor: 'rgba(122,220,125,0.15)',
-    shadowColor: '#96f996',
+    backgroundColor: isDark ? 'rgba(38,43,36,0.85)' : 'rgba(234,242,232,0.95)',
+    borderColor: isDark ? 'rgba(122,220,125,0.15)' : 'rgba(46,168,71,0.25)',
+    shadowColor: C.primaryFixedDim,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.12,
     shadowRadius: 16,
@@ -579,7 +579,7 @@ const getStyles = (C: ThemeColors, isDark: boolean) => StyleSheet.create({
   },
   chatCardGlow: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(150,249,150,0.04)',
+    backgroundColor: isDark ? 'rgba(150,249,150,0.04)' : 'rgba(46,168,71,0.04)',
     borderRadius: 20,
   },
   chatAvatar: {
@@ -595,7 +595,7 @@ const getStyles = (C: ThemeColors, isDark: boolean) => StyleSheet.create({
     borderColor: 'transparent',
   },
   chatAvatarActive: {
-    borderColor: 'rgba(122,220,125,0.4)',
+    borderColor: isDark ? 'rgba(122,220,125,0.4)' : 'rgba(46,168,71,0.5)',
   },
   chatAvatarText: {
     fontSize: 20,
@@ -624,7 +624,7 @@ const getStyles = (C: ThemeColors, isDark: boolean) => StyleSheet.create({
     includeFontPadding: false,
   },
   chatNameActive: {
-    color: C.white,
+    color: isDark ? C.white : C.onSurface,
     fontWeight: '700',
   },
   chatTime: {

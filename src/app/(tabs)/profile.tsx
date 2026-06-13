@@ -473,10 +473,10 @@ function getStyles(C: ThemeColors, isDark: boolean) {
   /* Profile Card */
   profileCard: {
     width: '100%',
-    backgroundColor: 'rgba(27,33,26,0.45)', // Glassmorphic surface dim
+    backgroundColor: C.cardBg, // Glassmorphic surface dim
     borderRadius: 32,
     borderWidth: 1,
-    borderColor: 'rgba(150,249,150,0.12)', // Matcha high-contrast subtle border
+    borderColor: C.cardBorder, // Matcha high-contrast subtle border
     paddingVertical: 32,
     paddingHorizontal: 20,
     alignItems: 'center',
@@ -610,10 +610,10 @@ function getStyles(C: ThemeColors, isDark: boolean) {
   /* Statistics */
   statsCard: {
     width: '100%',
-    backgroundColor: 'rgba(27,33,26,0.3)',
+    backgroundColor: C.cardBg,
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: 'rgba(150,249,150,0.06)',
+    borderColor: C.cardBorder,
     flexDirection: 'row',
     justifyContent: 'space-around',
     paddingVertical: 20,
@@ -653,10 +653,10 @@ function getStyles(C: ThemeColors, isDark: boolean) {
   /* Settings Options */
   optionsList: {
     width: '100%',
-    backgroundColor: 'rgba(27,33,26,0.3)',
+    backgroundColor: C.cardBg,
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: 'rgba(150,249,150,0.06)',
+    borderColor: C.cardBorder,
     paddingVertical: 8,
   },
   optionRow: {

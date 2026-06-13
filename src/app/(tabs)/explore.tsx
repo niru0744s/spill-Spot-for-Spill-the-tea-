@@ -798,16 +798,16 @@ function getStyles(C: ThemeColors, isDark: boolean) {
 
   // ── Feed card ─────────────────────────────────────────────────────────────
   card: {
-    backgroundColor: 'rgba(27,33,26,0.85)',
+    backgroundColor: C.cardBg,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(63,74,61,0.5)',
+    borderColor: C.cardBorder,
     overflow: 'hidden',
     gap: 10,
     padding: 14,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
+    shadowOpacity: isDark ? 0.25 : 0.08,
     shadowRadius: 10,
     elevation: 5,
   },
@@ -840,7 +840,7 @@ function getStyles(C: ThemeColors, isDark: boolean) {
     width: '100%',
     height: 130,
     borderRadius: 12,
-    backgroundColor: 'rgba(38,43,36,0.8)',
+    backgroundColor: C.surfaceHigh,
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -27,6 +27,8 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { NICHES } from '@/constants/niches';
+import { useTheme, useStyles } from '@/hooks/useTheme';
+import { ThemeColors } from '@/types/theme';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -53,6 +55,8 @@ interface PillProps {
 }
 
 function NichePill({ label, emoji, isSelected, isDisabled, onPress }: PillProps) {
+  const { colors: C, isDark } = useTheme();
+  const styles = useStyles(getStyles);
   const scale = useRef(new Animated.Value(1)).current;
 
   const onPressIn = () =>
@@ -98,6 +102,8 @@ export default function EditNichesSheet({
   onSave,
   isSaving,
 }: EditNichesSheetProps) {
+  const { colors: C, isDark } = useTheme();
+  const styles = useStyles(getStyles);
   const [selected, setSelected] = useState<Set<string>>(new Set(currentNiches));
 
   // Re-sync when sheet opens with fresh currentNiches
@@ -154,7 +160,7 @@ export default function EditNichesSheet({
             </Text>
           </View>
           <TouchableOpacity onPress={onClose} style={styles.closeBtn} activeOpacity={0.7}>
-            <MaterialIcons name="close" size={22} color="#899485" />
+            <MaterialIcons name="close" size={22} color={C.onSurfaceVariant} />
           </TouchableOpacity>
         </View>
 
@@ -194,7 +200,7 @@ export default function EditNichesSheet({
             activeOpacity={0.85}
           >
             {isSaving ? (
-              <ActivityIndicator color="#00390d" size="small" />
+              <ActivityIndicator color={C.onPrimaryContainer} size="small" />
             ) : (
               <Text style={[styles.saveBtnText, (!canSave || !hasChanges) && styles.saveBtnTextDisabled]}>
                 Save Niches ✓
@@ -208,147 +214,148 @@ export default function EditNichesSheet({
 }
 
 // ---------------------------------------------------------------------------
-// Styles
-// ---------------------------------------------------------------------------
+function getStyles(C: ThemeColors, isDark: boolean) {
+  return StyleSheet.create({
+    scrim: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.55)',
+    },
+    sheet: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      maxHeight: '82%',
+      backgroundColor: C.background,
+      borderTopLeftRadius: 28,
+      borderTopRightRadius: 28,
+      borderTopWidth: 1,
+      borderColor: C.cardBorder,
+      paddingBottom: Platform.OS === 'android' ? 20 : 8,
+    },
+    handle: {
+      width: 40,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: C.outlineVariant,
+      alignSelf: 'center',
+      marginTop: 12,
+      marginBottom: 8,
+      opacity: 0.5,
+    },
 
-const styles = StyleSheet.create({
-  scrim: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-  },
-  sheet: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    maxHeight: '82%',
-    backgroundColor: '#171d16',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    borderTopWidth: 1,
-    borderColor: 'rgba(150,249,150,0.1)',
-    paddingBottom: Platform.OS === 'android' ? 20 : 8,
-  },
-  handle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(137,148,133,0.4)',
-    alignSelf: 'center',
-    marginTop: 12,
-    marginBottom: 8,
-  },
+    // Header
+    sheetHeader: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      paddingHorizontal: 20,
+      paddingBottom: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: C.cardBorder,
+    },
+    sheetTitle: {
+      fontSize: 20,
+      fontWeight: '800',
+      color: C.onSurface,
+      letterSpacing: -0.3,
+    },
+    sheetSub: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: C.primaryDim,
+      letterSpacing: 0.8,
+      marginTop: 4,
+    },
+    closeBtn: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: C.surfaceContainerHigh,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
 
-  // Header
-  sheetHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingBottom: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(137,148,133,0.1)',
-  },
-  sheetTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#dfe4d9',
-    letterSpacing: -0.3,
-  },
-  sheetSub: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#96f996',
-    letterSpacing: 0.8,
-    marginTop: 4,
-  },
-  closeBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(49,54,47,0.7)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+    // Grid
+    grid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      paddingHorizontal: 20,
+      paddingTop: 16,
+      paddingBottom: 8,
+      gap: PILL_GAP,
+    },
 
-  // Grid
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 8,
-    gap: PILL_GAP,
-  },
+    // Pills
+    pill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      backgroundColor: C.cardBg,
+      borderWidth: 1.5,
+      borderColor: C.cardBorder,
+      borderRadius: 9999,
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+    },
+    pillSelected: {
+      backgroundColor: isDark ? 'rgba(150,249,150,0.13)' : 'rgba(46,168,71,0.13)',
+      borderColor: C.primary,
+      shadowColor: C.primary,
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.4,
+      shadowRadius: 8,
+      elevation: 5,
+    },
+    pillEmoji: { fontSize: 17 },
+    pillLabel: {
+      fontSize: 12,
+      fontWeight: '500',
+      color: C.onSurfaceVariant,
+      flexShrink: 1,
+    },
+    pillLabelSelected: { color: C.onSurface, fontWeight: '600' },
 
-  // Pills
-  pill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(27,33,26,0.9)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(137,148,133,0.2)',
-    borderRadius: 9999,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-  },
-  pillSelected: {
-    backgroundColor: 'rgba(150,249,150,0.13)',
-    borderColor: '#96f996',
-    shadowColor: '#96f996',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  pillEmoji: { fontSize: 17 },
-  pillLabel: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#becab9',
-    flexShrink: 1,
-  },
-  pillLabelSelected: { color: '#ffffff', fontWeight: '600' },
-
-  // Footer
-  sheetFooter: {
-    paddingHorizontal: 20,
-    paddingTop: 14,
-    paddingBottom: Platform.OS === 'android' ? 16 : 20,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(137,148,133,0.1)',
-    gap: 12,
-    alignItems: 'center',
-  },
-  ruleLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: 'rgba(137,148,133,0.55)',
-    letterSpacing: 1.4,
-  },
-  saveBtn: {
-    backgroundColor: '#96f996',
-    borderRadius: 9999,
-    paddingVertical: 15,
-    alignItems: 'center',
-    width: '100%',
-    shadowColor: '#96f996',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 14,
-    elevation: 6,
-  },
-  saveBtnDisabled: {
-    backgroundColor: 'rgba(49,54,47,0.8)',
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  saveBtnText: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#00390d',
-    letterSpacing: 0.3,
-  },
-  saveBtnTextDisabled: { color: '#899485' },
-});
+    // Footer
+    sheetFooter: {
+      paddingHorizontal: 20,
+      paddingTop: 14,
+      paddingBottom: Platform.OS === 'android' ? 16 : 20,
+      borderTopWidth: 1,
+      borderTopColor: C.cardBorder,
+      gap: 12,
+      alignItems: 'center',
+    },
+    ruleLabel: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: C.onSurfaceVariant,
+      letterSpacing: 1.4,
+      opacity: 0.7,
+    },
+    saveBtn: {
+      backgroundColor: C.primaryContainer,
+      borderRadius: 9999,
+      paddingVertical: 15,
+      alignItems: 'center',
+      width: '100%',
+      shadowColor: C.primaryContainer,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 14,
+      elevation: 6,
+    },
+    saveBtnDisabled: {
+      backgroundColor: C.surfaceContainerHighest,
+      shadowOpacity: 0,
+      elevation: 0,
+    },
+    saveBtnText: {
+      fontSize: 16,
+      fontWeight: '800',
+      color: C.onPrimaryContainer,
+      letterSpacing: 0.3,
+    },
+    saveBtnTextDisabled: { color: C.onSurfaceVariant },
+  });
+}
