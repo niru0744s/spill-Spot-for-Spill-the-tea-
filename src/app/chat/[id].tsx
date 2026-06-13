@@ -67,24 +67,8 @@ import {
   setAudioModeAsync,
 } from 'expo-audio';
 import { useVideoPlayer, VideoView } from 'expo-video';
-
-/* ── Design tokens ─────────────────────────────────── */
-const C = {
-  background:              '#0f150e',
-  surfaceContainer:        '#1b211a',
-  surfaceContainerHigh:    '#262b24',
-  surfaceContainerHighest: '#31362f',
-  primaryContainer:        '#96f996',
-  primaryFixed:            '#96f996',
-  primaryFixedDim:         '#7adc7d',
-  onPrimaryFixed:          '#002105',
-  onPrimaryContainer:      '#037524',
-  onSurface:               '#dfe4d9',
-  onSurfaceVariant:        '#becab9',
-  outlineVariant:          '#3f4a3d',
-  errorColor:              '#ff6b6b',
-  white:                   '#ffffff',
-};
+import { useTheme, useStyles } from '@/hooks/useTheme';
+import { ThemeColors } from '@/types/theme';
 
 const getMessageTime = (msg: StoredMessage | null | undefined): number => {
   if (!msg) return Date.now();
@@ -104,6 +88,7 @@ const getMessageTime = (msg: StoredMessage | null | undefined): number => {
 
 /* ── Typing indicator dots ─────────────────────────── */
 function TypingIndicator() {
+  const styles = useStyles(getStyles);
   const dot1 = useRef(new Animated.Value(0)).current;
   const dot2 = useRef(new Animated.Value(0)).current;
   const dot3 = useRef(new Animated.Value(0)).current;
@@ -134,6 +119,7 @@ function TypingIndicator() {
 
 /* ── Date divider ──────────────────────────────────── */
 function DateDivider({ label }: { label: string }) {
+  const styles = useStyles(getStyles);
   return (
     <View style={styles.dateDividerRow}>
       <Text style={styles.dateDividerText}>{label}</Text>
@@ -143,6 +129,7 @@ function DateDivider({ label }: { label: string }) {
 
 /* ── Status tick ───────────────────────────────────── */
 function StatusTick({ status }: { status: StoredMessage['status'] }) {
+  const { colors: C } = useTheme();
   if (status === 'SENDING') {
     return <ActivityIndicator size={10} color={C.onSurfaceVariant} style={{ marginLeft: 4 }} />;
   }
@@ -171,6 +158,8 @@ const AudioPlayerBubbleInner = memo(function AudioPlayerBubbleInner({
   isMine: boolean;
   status: string;
 }) {
+  const { colors: C } = useTheme();
+  const styles = useStyles(getStyles);
   const audioSource = Platform.OS === 'android' && localUri.startsWith('file://')
     ? localUri.replace('file://', '')
     : localUri;
@@ -250,6 +239,8 @@ const AudioPlayerBubble = memo(function AudioPlayerBubble({
   isMine: boolean;
   status: string;
 }) {
+  const { colors: C } = useTheme();
+  const styles = useStyles(getStyles);
   if (!localUri) {
     return (
       <View style={styles.audioBubble}>
@@ -280,6 +271,8 @@ const MessageBubble = memo(function MessageBubble({
   setVideoPlayerUri: (uri: string | null) => void;
   setVideoModalVisible: (visible: boolean) => void;
 }) {
+  const { colors: C } = useTheme();
+  const styles = useStyles(getStyles);
   const isGrouped = prevItem &&
     prevItem.isMine === item.isMine &&
     item.createdAt - prevItem.createdAt < 60_000; // within 1 minute
@@ -454,6 +447,8 @@ const MessageBubble = memo(function MessageBubble({
 
 /* ── Offline banner ─────────────────────────────────── */
 function OfflineBanner() {
+  const { colors: C } = useTheme();
+  const styles = useStyles(getStyles);
   return (
     <View style={styles.offlineBanner}>
       <MaterialIcons name="wifi-off" size={14} color={C.onSurfaceVariant} />
@@ -491,6 +486,8 @@ function VideoPlayerModal({ uri, visible, onClose }: { uri: string | null; visib
 
 /* ── Main Screen ────────────────────────────────────── */
 export default function ChatRoomScreen() {
+  const { colors: C, isDark } = useTheme();
+  const styles = useStyles(getStyles);
   const router  = useRouter();
   const insets  = useSafeAreaInsets();
   const params  = useLocalSearchParams<{
@@ -1463,41 +1460,42 @@ export default function ChatRoomScreen() {
 }
 
 /* ── StyleSheet ──────────────────────────────────────── */
-const styles = StyleSheet.create({
+function getStyles(C: ThemeColors, isDark: boolean) {
+  return StyleSheet.create({
   container:               { flex: 1, backgroundColor: C.background },
 
   offlineBanner: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: 'rgba(255,107,107,0.12)',
+    backgroundColor: isDark ? 'rgba(255,107,107,0.12)' : 'rgba(211,47,47,0.12)',
     paddingHorizontal: 16, paddingVertical: 7,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,107,107,0.2)',
+    borderBottomWidth: 1, borderBottomColor: isDark ? 'rgba(255,107,107,0.2)' : 'rgba(211,47,47,0.2)',
   },
   offlineBannerText:       { fontSize: 12, color: C.onSurfaceVariant, flex: 1 },
 
   header: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 8, paddingVertical: 10,
-    backgroundColor: 'rgba(15,21,14,0.92)',
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)',
-    shadowColor: '#96f996', shadowOffset: { width: 0, height: 2 },
+    backgroundColor: isDark ? 'rgba(15,21,14,0.92)' : 'rgba(244,250,243,0.92)',
+    borderBottomWidth: 1, borderBottomColor: C.outlineVariant,
+    shadowColor: C.primary, shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08, shadowRadius: 12, elevation: 6, zIndex: 10,
   },
   headerIconBtn:           { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   headerProfile:           { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, marginLeft: 4 },
   headerAvatarWrap:        { position: 'relative', width: 40, height: 40 },
-  headerAvatar:            { width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderColor: C.surfaceContainerHighest },
-  headerAvatarFallback:    { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(122,220,125,0.18)', borderWidth: 2, borderColor: 'rgba(122,220,125,0.35)', alignItems: 'center', justifyContent: 'center' },
-  headerAvatarInitial:     { fontSize: 18, fontWeight: '800', color: C.primaryFixedDim },
-  headerOnlineDot:         { position: 'absolute', bottom: 0, right: 0, width: 12, height: 12, borderRadius: 6, backgroundColor: C.primaryFixed, borderWidth: 2, borderColor: C.background },
+  headerAvatar:            { width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderColor: C.outlineVariant },
+  headerAvatarFallback:    { width: 40, height: 40, borderRadius: 20, backgroundColor: C.surfaceContainer, borderWidth: 2, borderColor: C.outlineVariant, alignItems: 'center', justifyContent: 'center' },
+  headerAvatarInitial:     { fontSize: 18, fontWeight: '800', color: C.primary },
+  headerOnlineDot:         { position: 'absolute', bottom: 0, right: 0, width: 12, height: 12, borderRadius: 6, backgroundColor: C.primary, borderWidth: 2, borderColor: C.background },
   headerName:              { fontSize: 17, fontWeight: '700', color: C.onSurface, letterSpacing: -0.3 },
   headerStatus:            { fontSize: 12, fontWeight: '500', color: C.onSurfaceVariant, marginTop: 1 },
-  headerStatusOnline:      { color: C.primaryFixedDim },
+  headerStatusOnline:      { color: C.primary },
   headerActions:           { flexDirection: 'row', gap: 2 },
 
   messageList:             { paddingHorizontal: 16, paddingTop: 8 },
 
   dateDividerRow:          { alignItems: 'center', marginVertical: 16 },
-  dateDividerText:         { fontSize: 11, fontWeight: '700', color: C.onSurfaceVariant, letterSpacing: 1.5, backgroundColor: 'rgba(27,33,26,0.7)', paddingHorizontal: 14, paddingVertical: 5, borderRadius: 9999, overflow: 'hidden' },
+  dateDividerText:         { fontSize: 11, fontWeight: '700', color: C.onSurfaceVariant, letterSpacing: 1.5, backgroundColor: C.surfaceContainer, paddingHorizontal: 14, paddingVertical: 5, borderRadius: 9999, overflow: 'hidden' },
 
   bubbleRow:               { maxWidth: '82%', marginBottom: 2 },
   bubbleRowIn:             { alignSelf: 'flex-start', alignItems: 'flex-start' },
@@ -1506,13 +1504,13 @@ const styles = StyleSheet.create({
   bubbleGrouped:           { marginTop: 2 },
 
   bubble:                  { paddingHorizontal: 16, paddingVertical: 11, borderRadius: 20 },
-  bubbleIn:                { backgroundColor: C.surfaceContainerHigh, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
-  bubbleOut:               { backgroundColor: C.primaryFixed, shadowColor: '#96f996', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.18, shadowRadius: 14, elevation: 6 },
+  bubbleIn:                { backgroundColor: C.surfaceContainerHigh, borderWidth: 1, borderColor: C.cardBorder },
+  bubbleOut:               { backgroundColor: C.primary, shadowColor: C.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.18, shadowRadius: 14, elevation: 6 },
   bubbleInCorner:          { borderBottomLeftRadius: 4 },
   bubbleOutCorner:         { borderBottomRightRadius: 4 },
   bubbleText:              { fontSize: 16, lineHeight: 22, fontWeight: '500' },
   bubbleTextIn:            { color: C.onSurface },
-  bubbleTextOut:           { color: C.onPrimaryFixed },
+  bubbleTextOut:           { color: isDark ? '#002105' : '#ffffff' },
 
   deletedBubble:           { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 4, paddingVertical: 2 },
   deletedText:             { fontSize: 15, fontStyle: 'italic', color: C.onSurfaceVariant, fontWeight: '400' },
@@ -1521,16 +1519,16 @@ const styles = StyleSheet.create({
   metaTime:                { fontSize: 10, fontWeight: '600', color: C.onSurfaceVariant, letterSpacing: 0.3 },
   metaTimeIn:              { fontSize: 10, fontWeight: '600', color: C.onSurfaceVariant, letterSpacing: 0.3, marginTop: 4, marginLeft: 4, marginBottom: 4 },
 
-  typingBubble:            { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: C.surfaceContainerHigh, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)', borderRadius: 20, borderBottomLeftRadius: 4, paddingHorizontal: 16, paddingVertical: 14, alignSelf: 'flex-start', marginTop: 6, marginLeft: 16, marginBottom: 8, width: 68 },
-  typingDot:               { width: 8, height: 8, borderRadius: 4, backgroundColor: C.primaryFixed },
+  typingBubble:            { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: C.surfaceContainerHigh, borderWidth: 1, borderColor: C.cardBorder, borderRadius: 20, borderBottomLeftRadius: 4, paddingHorizontal: 16, paddingVertical: 14, alignSelf: 'flex-start', marginTop: 6, marginLeft: 16, marginBottom: 8, width: 68 },
+  typingDot:               { width: 8, height: 8, borderRadius: 4, backgroundColor: C.primary },
 
-  inputBar:                { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 10, paddingTop: 12, backgroundColor: 'rgba(15,21,14,0.95)', borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)', gap: 6 },
+  inputBar:                { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 10, paddingTop: 12, backgroundColor: isDark ? 'rgba(15,21,14,0.95)' : 'rgba(244,250,243,0.95)', borderTopWidth: 1, borderTopColor: C.outlineVariant, gap: 6 },
   inputIconBtn:            { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
   inputPill:               { flex: 1, flexDirection: 'row', alignItems: 'flex-end', backgroundColor: C.surfaceContainerHighest, borderRadius: 24, borderWidth: 1.5, borderColor: C.outlineVariant, paddingHorizontal: 14, paddingVertical: 4, minHeight: 50 },
   textInput:               { flex: 1, fontSize: 16, fontWeight: '400', color: C.onSurface, paddingTop: Platform.OS === 'ios' ? 10 : 8, paddingBottom: Platform.OS === 'ios' ? 10 : 8, maxHeight: 110 },
   emojiBtn:                { width: 36, height: 44, alignItems: 'center', justifyContent: 'center', marginLeft: 4 },
   sendBtn:                 { width: 46, height: 46, borderRadius: 23, backgroundColor: C.surfaceContainerHighest, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
-  sendBtnActive:           { backgroundColor: C.primaryContainer, shadowColor: '#96f996', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.4, shadowRadius: 14, elevation: 8 },
+  sendBtnActive:           { backgroundColor: C.primary, shadowColor: C.primary, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.4, shadowRadius: 14, elevation: 8 },
 
   // Skeleton Styling
   skeletonContainer: {
@@ -1557,19 +1555,19 @@ const styles = StyleSheet.create({
     backgroundColor: C.surfaceContainerHigh,
     borderBottomLeftRadius: 4,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: C.cardBorder,
   },
   skeletonBubbleOut: {
-    backgroundColor: 'rgba(150, 249, 150, 0.15)',
+    backgroundColor: isDark ? 'rgba(150, 249, 150, 0.15)' : 'rgba(46, 168, 71, 0.15)',
     borderBottomRightRadius: 4,
     borderWidth: 1,
-    borderColor: 'rgba(150, 249, 150, 0.25)',
+    borderColor: isDark ? 'rgba(150, 249, 150, 0.25)' : 'rgba(46, 168, 71, 0.25)',
   },
 
   // Modal styling
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(15,21,14,0.75)',
+    backgroundColor: isDark ? 'rgba(15,21,14,0.75)' : 'rgba(244,250,243,0.75)',
     justifyContent: 'flex-end',
   },
   modalContent: {
@@ -1580,7 +1578,7 @@ const styles = StyleSheet.create({
     paddingBottom: Platform.OS === 'ios' ? 40 : 24,
     paddingTop: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    borderColor: C.cardBorder,
   },
   modalHeaderLine: {
     width: 36,
@@ -1602,7 +1600,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
+    borderBottomColor: C.outlineVariant,
     gap: 12,
   },
   modalOptionText: {
@@ -1621,6 +1619,9 @@ const styles = StyleSheet.create({
     color: C.onSurfaceVariant,
   },
   editModalContent: {
+    backgroundColor: C.surfaceContainerHigh,
+    borderWidth: 1,
+    borderColor: C.cardBorder,
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
     borderRadius: 24,
@@ -1667,7 +1668,7 @@ const styles = StyleSheet.create({
     color: C.onSurfaceVariant,
   },
   editSaveBtn: {
-    backgroundColor: C.primaryContainer,
+    backgroundColor: C.primary,
   },
   editSaveBtnDisabled: {
     opacity: 0.5,
@@ -1675,7 +1676,7 @@ const styles = StyleSheet.create({
   editSaveBtnText: {
     fontSize: 15,
     fontWeight: '700',
-    color: C.onPrimaryContainer,
+    color: isDark ? '#002105' : '#ffffff',
   },
   
   /* ── Media bubbles ──────────────────────────────────── */
@@ -1740,7 +1741,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 10,
-    backgroundColor: 'rgba(150,249,150,0.08)',
+    backgroundColor: isDark ? 'rgba(150,249,150,0.08)' : 'rgba(46,168,71,0.08)',
     borderRadius: 12,
     maxWidth: 220,
   },
@@ -1748,7 +1749,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 8,
-    backgroundColor: C.primaryFixedDim,
+    backgroundColor: C.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1780,7 +1781,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: C.primaryFixedDim,
+    backgroundColor: C.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1791,13 +1792,13 @@ const styles = StyleSheet.create({
   audioProgressBarBg: {
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(150,249,150,0.15)',
+    backgroundColor: isDark ? 'rgba(150,249,150,0.15)' : 'rgba(46,168,71,0.15)',
     width: '100%',
     overflow: 'hidden',
   },
   audioProgressBar: {
     height: '100%',
-    backgroundColor: C.primaryFixedDim,
+    backgroundColor: C.primary,
   },
   audioTimeText: {
     fontSize: 10,
@@ -1808,7 +1809,7 @@ const styles = StyleSheet.create({
   attachmentModalContainer: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: isDark ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0.15)',
   },
   attachmentModalContent: {
     backgroundColor: C.surfaceContainer,
@@ -1817,7 +1818,7 @@ const styles = StyleSheet.create({
     padding: 24,
     gap: 20,
     borderTopWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    borderColor: C.cardBorder,
   },
   attachmentModalHeader: {
     flexDirection: 'row',
@@ -1849,7 +1850,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    borderColor: C.cardBorder,
   },
   attachmentOptionLabel: {
     fontSize: 12,
@@ -1870,7 +1871,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     borderTopWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    borderColor: C.cardBorder,
   },
   recordingTimerWrap: {
     flexDirection: 'row',
@@ -1911,3 +1912,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 });
+}

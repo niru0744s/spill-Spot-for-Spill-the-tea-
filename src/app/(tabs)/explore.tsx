@@ -49,24 +49,13 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useAuth } from '@/hooks/useAuth';
 import EditNichesSheet from '@/components/EditNichesSheet';
 import { NICHE_KEYWORDS, ALL_NICHES, NICHE_EMOJI } from '@/constants/niches';
+import { useTheme, useStyles } from '@/hooks/useTheme';
+import { ThemeColors } from '@/types/theme';
 
 // ---------------------------------------------------------------------------
 // Design tokens (matching DESIGN.md — no imports, keep self-contained)
 // ---------------------------------------------------------------------------
 
-const C = {
-  background:           '#0f150e',
-  surface:              '#1b211a',
-  surfaceHigh:          '#262b24',
-  surfaceVariant:       '#31362f',
-  primary:              '#96f996',
-  primaryDim:           '#7adc7d',
-  secondary:            '#ffb59c',
-  onSurface:            '#dfe4d9',
-  onSurfaceVariant:     '#becab9',
-  outline:              '#899485',
-  outlineVariant:       'rgba(63,74,61,0.6)',
-};
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
@@ -183,6 +172,7 @@ interface GNewsArticle {
 
 /** Shown at the top when the user hasn't set their niches yet */
 function NicheSetBanner({ onPress }: { onPress: () => void }) {
+  const styles = useStyles(getStyles);
   const pulse = useSharedValue(1);
 
   useEffect(() => {
@@ -217,6 +207,7 @@ function NicheSetBanner({ onPress }: { onPress: () => void }) {
 
 /** Shimmer placeholder card shown while loading */
 function SkeletonCard() {
+  const styles = useStyles(getStyles);
   const opacity = useSharedValue(0.4);
 
   useEffect(() => {
@@ -247,6 +238,7 @@ function SkeletonCard() {
 
 /** Individual news card */
 function FeedCard({ article, index }: { article: NewsArticle; index: number }) {
+  const styles = useStyles(getStyles);
   const scale = useSharedValue(1);
   // Flip to emoji fallback if the image URL fails to load
   const [imgError, setImgError] = useState(false);
@@ -322,6 +314,7 @@ function FeedCard({ article, index }: { article: NewsArticle; index: number }) {
 
 /** Floating edit FAB */
 function EditFAB({ onPress }: { onPress: () => void }) {
+  const styles = useStyles(getStyles);
   const scale = useSharedValue(1);
   const onPressIn  = () => {
     scale.value = withSpring(0.9, { damping: 10, stiffness: 300 });
@@ -360,6 +353,8 @@ function EditFAB({ onPress }: { onPress: () => void }) {
 const PAGE_SIZE = 10;
 
 export default function ExploreScreen() {
+  const { colors: C } = useTheme();
+  const styles = useStyles(getStyles);
   const insets = useSafeAreaInsets();
   const { user, saveNiches, isLoading } = useAuth();
 
@@ -657,7 +652,8 @@ export default function ExploreScreen() {
 // Styles
 // ---------------------------------------------------------------------------
 
-const styles = StyleSheet.create({
+function getStyles(C: ThemeColors, isDark: boolean) {
+  return StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: C.background,
@@ -939,3 +935,4 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
 });
+}

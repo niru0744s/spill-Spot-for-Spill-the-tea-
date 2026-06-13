@@ -33,27 +33,15 @@ import { useInbox, type InboxItem } from '@/hooks/useInbox';
 import { useAuth } from '@/hooks/useAuth';
 import { isUserOnline } from '@/services/presenceService';
 import { triggerSelection, triggerMediumImpact } from '@/services/hapticService';
+import { useTheme, useStyles } from '@/hooks/useTheme';
+import { ThemeColors } from '@/types/theme';
 
 const { width } = Dimensions.get('window');
 
-/* ── Design tokens ─────────────────────────────────────────── */
-const C = {
-  background:         '#0f150e',
-  surfaceContainer:   '#1b211a',
-  surfaceContainerHigh: '#262b24',
-  primaryContainer:   '#96f996',
-  onPrimaryContainer: '#037524',
-  primaryFixedDim:    '#7adc7d',
-  secondary:          '#ffb59c',
-  secondaryContainer: '#8e2c01',
-  onSurface:          '#dfe4d9',
-  onSurfaceVariant:   '#becab9',
-  outlineVariant:     '#3f4a3d',
-  white:              '#ffffff',
-};
-
 /* ── Orbital background orb ────────────────────────────────── */
 function OrbBackground() {
+  const { colors: C } = useTheme();
+  const styles = useStyles(getStyles);
   const orb1x = useRef(new Animated.Value(0)).current;
   const orb1y = useRef(new Animated.Value(0)).current;
   const orb2x = useRef(new Animated.Value(0)).current;
@@ -116,6 +104,8 @@ function OrbBackground() {
 
 /* ── Pulsing notification dot ──────────────────────────────── */
 function PulseDot() {
+  const { colors: C } = useTheme();
+  const styles = useStyles(getStyles);
   const scale = useRef(new Animated.Value(1)).current;
   useEffect(() => {
     Animated.loop(
@@ -132,6 +122,8 @@ function PulseDot() {
 
 /* ── "My Tea" story bubble ─────────────────────────────────── */
 function MyTeaBubble({ displayName, photoURL }: { displayName: string; photoURL: string | null | undefined }) {
+  const { colors: C } = useTheme();
+  const styles = useStyles(getStyles);
   return (
     <View style={styles.storyItem}>
       <View style={styles.myTeaRing}>
@@ -157,6 +149,8 @@ function MyTeaBubble({ displayName, photoURL }: { displayName: string; photoURL:
 
 /* ── Chat card ─────────────────────────────────────────────── */
 const ChatCard = React.memo(function ChatCard({ item, onPress, index }: { item: InboxItem; onPress: () => void; index: number }) {
+  const { colors: C } = useTheme();
+  const styles = useStyles(getStyles);
   const fadeAnim  = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
 
@@ -255,6 +249,8 @@ function formatTime(ms: number): string {
 
 /* ── Empty state ───────────────────────────────────────────── */
 function EmptyState() {
+  const { colors: C } = useTheme();
+  const styles = useStyles(getStyles);
   const floatAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -281,6 +277,8 @@ function EmptyState() {
 
 /* ── Main Screen ───────────────────────────────────────────── */
 export default function ChatsScreen() {
+  const { colors: C, isDark } = useTheme();
+  const styles = useStyles(getStyles);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { chats, refresh } = useInbox();
@@ -384,7 +382,7 @@ export default function ChatsScreen() {
 }
 
 /* ── StyleSheet ─────────────────────────────────────────────── */
-const styles = StyleSheet.create({
+const getStyles = (C: ThemeColors, isDark: boolean) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: C.background,

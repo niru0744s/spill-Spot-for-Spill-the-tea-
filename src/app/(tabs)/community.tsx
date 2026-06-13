@@ -18,23 +18,14 @@ import { useInbox } from '@/hooks/useInbox';
 import { GroupCard, type GroupCardItem } from '@/components/GroupCard';
 import { getMessages, getUnreadCount } from '@/services/chatStorage';
 import { storage } from '@/services/mmkv';
+import { useTheme, useStyles } from '@/hooks/useTheme';
+import { ThemeColors } from '@/types/theme';
 
 const { width } = Dimensions.get('window');
 
-const C = {
-  background: '#0f150e',
-  surfaceContainer: '#1b211a',
-  surfaceContainerHigh: '#262b24',
-  primaryFixedDim: '#7adc7d',
-  secondary: '#ffb59c',
-  onSurface: '#dfe4d9',
-  onSurfaceVariant: '#becab9',
-  outlineVariant: '#3f4a3d',
-  white: '#ffffff',
-};
-
 /* ── Animated Orbital Background ───────────────────────────── */
 function OrbBackground() {
+  const styles = useStyles(getStyles);
   const orb1x = useRef(new Animated.Value(0)).current;
   const orb1y = useRef(new Animated.Value(0)).current;
   const orb2x = useRef(new Animated.Value(0)).current;
@@ -95,6 +86,8 @@ function OrbBackground() {
 
 /* ── Empty State ───────────────────────────────────────────── */
 function EmptyState({ onCreateGroup }: { onCreateGroup: () => void }) {
+  const { colors: C } = useTheme();
+  const styles = useStyles(getStyles);
   const floatAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -127,6 +120,8 @@ export default function CommunityScreen() {
   const insets = useSafeAreaInsets();
   const { chats, refresh } = useInbox();
   const [localPreviewTrigger, setLocalPreviewTrigger] = useState(0);
+  const { colors: C } = useTheme();
+  const styles = useStyles(getStyles);
   const isLoading = false;
 
   // Fetch groups on focus
@@ -238,7 +233,8 @@ export default function CommunityScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function getStyles(C: ThemeColors, isDark: boolean) {
+  return StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: C.background,
@@ -352,3 +348,4 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
   },
 });
+}

@@ -7,6 +7,8 @@ import {
   Animated,
   Image,
 } from 'react-native';
+import { useTheme, useStyles } from '@/hooks/useTheme';
+import { ThemeColors } from '@/types/theme';
 
 export interface GroupCardItem {
   id: string;
@@ -26,19 +28,9 @@ interface GroupCardProps {
   index: number;
 }
 
-const C = {
-  background: '#0f150e',
-  surfaceContainer: '#1b211a',
-  surfaceContainerHigh: '#262b24',
-  primaryFixedDim: '#7adc7d',
-  secondary: '#ffb59c',
-  onSurface: '#dfe4d9',
-  onSurfaceVariant: '#becab9',
-  outlineVariant: '#3f4a3d',
-  white: '#ffffff',
-};
-
 export function GroupCard({ item, onPress, index }: GroupCardProps) {
+  const { colors: C } = useTheme();
+  const styles = useStyles(getStyles);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(15)).current;
 
@@ -142,24 +134,24 @@ export function GroupCard({ item, onPress, index }: GroupCardProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (C: ThemeColors, isDark: boolean) => StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
     marginHorizontal: 20,
     marginBottom: 10,
     padding: 14,
-    backgroundColor: 'rgba(27,33,26,0.65)',
+    backgroundColor: C.cardBg,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    borderColor: C.cardBorder,
     overflow: 'hidden',
     position: 'relative',
   },
   cardActive: {
-    backgroundColor: 'rgba(38,43,36,0.85)',
-    borderColor: 'rgba(122,220,125,0.15)',
-    shadowColor: '#96f996',
+    backgroundColor: isDark ? 'rgba(38,43,36,0.85)' : 'rgba(234,242,232,0.95)',
+    borderColor: isDark ? 'rgba(122,220,125,0.15)' : 'rgba(46,168,71,0.25)',
+    shadowColor: C.primaryFixedDim,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.12,
     shadowRadius: 16,
@@ -171,7 +163,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(150,249,150,0.04)',
+    backgroundColor: isDark ? 'rgba(150,249,150,0.04)' : 'rgba(46,168,71,0.04)',
     borderRadius: 20,
   },
   avatar: {
@@ -187,12 +179,12 @@ const styles = StyleSheet.create({
   },
   avatarActive: {
     borderWidth: 2,
-    borderColor: 'rgba(122,220,125,0.4)',
+    borderColor: isDark ? 'rgba(122,220,125,0.4)' : 'rgba(46,168,71,0.5)',
   },
   avatarRemoved: {
     opacity: 0.5,
     borderWidth: 1,
-    borderColor: '#ffb59c',
+    borderColor: C.secondary,
   },
   avatarImg: {
     width: '100%',
@@ -206,7 +198,7 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
   },
   avatarTextRemoved: {
-    color: '#ffb59c',
+    color: C.secondary,
   },
   adminBadge: {
     position: 'absolute',
@@ -278,7 +270,7 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
   },
   removedTag: {
-    backgroundColor: 'rgba(255,181,156,0.15)',
+    backgroundColor: isDark ? 'rgba(255,181,156,0.15)' : 'rgba(224,101,61,0.15)',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
@@ -286,7 +278,7 @@ const styles = StyleSheet.create({
   removedText: {
     fontSize: 9,
     fontWeight: '800',
-    color: '#ffb59c',
+    color: C.secondary,
     textTransform: 'uppercase',
     includeFontPadding: false,
   },

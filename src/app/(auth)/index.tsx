@@ -23,25 +23,15 @@ import {
   StatusBar,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useTheme, useStyles } from '@/hooks/useTheme';
+import { ThemeColors } from '@/types/theme';
 
 const { width, height } = Dimensions.get('window');
 
-/* ─── Design tokens (from DESIGN.md / Stitch) ──────────────── */
-const C = {
-  background:         '#0f150e',
-  primaryContainer:   '#96f996',  // matcha green button bg
-  onPrimaryContainer: '#037524',  // dark green text on matcha
-  primaryFixedDim:    '#7adc7d',  // cup / glow color
-  secondary:          '#ffb59c',  // peach badge bg
-  onSecondary:        '#5c1a00',  // dark text on peach badge
-  onSurface:          '#dfe4d9',  // main text (cream-white)
-  onSurfaceVariant:   '#becab9',  // subtitle / muted text
-  outlineVariant:     '#3f4a3d',  // outline button border
-  secondaryFixed:     '#ffdbcf',  // outline button text (peach-light)
-};
-
 /* ─── Animated Coffee Cup ───────────────────────────────────── */
 function CoffeeCupIcon({ glowAnim }: { glowAnim: Animated.Value }) {
+  const { colors: C, isDark } = useTheme();
+  const styles = useStyles(getStyles);
   const bounceAnim = useRef(new Animated.Value(0)).current;
   const steamAnim  = useRef(new Animated.Value(0)).current;
 
@@ -117,6 +107,8 @@ function CoffeeCupIcon({ glowAnim }: { glowAnim: Animated.Value }) {
 
 /* ─── Landing Screen ────────────────────────────────────────── */
 export default function LandingScreen() {
+  const { colors: C, isDark } = useTheme();
+  const styles = useStyles(getStyles);
   const router = useRouter();
 
   const glowAnim  = useRef(new Animated.Value(0)).current;
@@ -149,7 +141,7 @@ export default function LandingScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} translucent backgroundColor="transparent" />
 
       {/* ── Background glow blobs ──────────────────────────── */}
       <Animated.View
@@ -204,201 +196,203 @@ export default function LandingScreen() {
 }
 
 /* ─── StyleSheet ────────────────────────────────────────────── */
-const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: C.background,
-  },
-  container: {
-    flex: 1,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingBottom: 40,
-    paddingTop: 16,
-  },
+function getStyles(C: ThemeColors, isDark: boolean) {
+  return StyleSheet.create({
+    safe: {
+      flex: 1,
+      backgroundColor: C.background,
+    },
+    container: {
+      flex: 1,
+      paddingHorizontal: 20,
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingBottom: 40,
+      paddingTop: 16,
+    },
 
-  /* Background blobs */
-  blobTopLeft: {
-    position: 'absolute',
-    top: -(height * 0.08),
-    left: -(width * 0.08),
-    width: width * 0.55,
-    height: width * 0.55,
-    borderRadius: width * 0.275,
-    backgroundColor: C.primaryContainer,
-  },
-  blobBottomRight: {
-    position: 'absolute',
-    bottom: -(height * 0.08),
-    right: -(width * 0.08),
-    width: width * 0.65,
-    height: width * 0.65,
-    borderRadius: width * 0.325,
-    backgroundColor: '#8e2c01',
-  },
+    /* Background blobs */
+    blobTopLeft: {
+      position: 'absolute',
+      top: -(height * 0.08),
+      left: -(width * 0.08),
+      width: width * 0.55,
+      height: width * 0.55,
+      borderRadius: width * 0.275,
+      backgroundColor: C.primaryContainer,
+    },
+    blobBottomRight: {
+      position: 'absolute',
+      bottom: -(height * 0.08),
+      right: -(width * 0.08),
+      width: width * 0.65,
+      height: width * 0.65,
+      borderRadius: width * 0.325,
+      backgroundColor: C.secondaryContainer,
+    },
 
-  /* Hero section */
-  hero: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 28,
-  },
+    /* Hero section */
+    hero: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 28,
+    },
 
-  /* ── Icon wrapper ─────────────────────────────────────────── */
-  iconWrapper: {
-    width: 130,
-    height: 130,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  iconGlow: {
-    position: 'absolute',
-    width: 108,
-    height: 108,
-    borderRadius: 54,
-    backgroundColor: C.primaryFixedDim,
-  },
+    /* ── Icon wrapper ─────────────────────────────────────────── */
+    iconWrapper: {
+      width: 130,
+      height: 130,
+      alignItems: 'center',
+      justifyContent: 'center',
+      position: 'relative',
+    },
+    iconGlow: {
+      position: 'absolute',
+      width: 108,
+      height: 108,
+      borderRadius: 54,
+      backgroundColor: C.primaryFixedDim,
+    },
 
-  /* Cup */
-  cupOuter: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-    paddingTop: 16,
-  },
-  steamWisp: {
-    position: 'absolute',
-    width: 4,
-    height: 14,
-    borderRadius: 2,
-    backgroundColor: 'rgba(122,220,125,0.6)',
-    top: 0,
-  },
-  steamL: { left: 22 },
-  steamM: { left: 36 },
-  steamR: { left: 50 },
-  cupRim: {
-    width: 68,
-    height: 7,
-    backgroundColor: C.primaryFixedDim,
-    borderRadius: 4,
-    marginBottom: 2,
-  },
-  cupRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  cupBody: {
-    width: 60,
-    height: 42,
-    backgroundColor: C.primaryFixedDim,
-    borderBottomLeftRadius: 10,
-    borderBottomRightRadius: 10,
-    borderTopLeftRadius: 2,
-    borderTopRightRadius: 2,
-  },
-  cupHandle: {
-    width: 15,
-    height: 26,
-    borderRadius: 10,
-    borderWidth: 4,
-    borderColor: C.primaryFixedDim,
-    backgroundColor: 'transparent',
-    marginLeft: -2,
-    marginTop: 6,
-  },
-  cupSaucer: {
-    width: 76,
-    height: 7,
-    backgroundColor: C.primaryFixedDim,
-    borderRadius: 4,
-    marginTop: 2,
-  },
+    /* Cup */
+    cupOuter: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      position: 'relative',
+      paddingTop: 16,
+    },
+    steamWisp: {
+      position: 'absolute',
+      width: 4,
+      height: 14,
+      borderRadius: 2,
+      backgroundColor: 'rgba(122,220,125,0.6)',
+      top: 0,
+    },
+    steamL: { left: 22 },
+    steamM: { left: 36 },
+    steamR: { left: 50 },
+    cupRim: {
+      width: 68,
+      height: 7,
+      backgroundColor: C.primaryFixedDim,
+      borderRadius: 4,
+      marginBottom: 2,
+    },
+    cupRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    cupBody: {
+      width: 60,
+      height: 42,
+      backgroundColor: C.primaryFixedDim,
+      borderBottomLeftRadius: 10,
+      borderBottomRightRadius: 10,
+      borderTopLeftRadius: 2,
+      borderTopRightRadius: 2,
+    },
+    cupHandle: {
+      width: 15,
+      height: 26,
+      borderRadius: 10,
+      borderWidth: 4,
+      borderColor: C.primaryFixedDim,
+      backgroundColor: 'transparent',
+      marginLeft: -2,
+      marginTop: 6,
+    },
+    cupSaucer: {
+      width: 76,
+      height: 7,
+      backgroundColor: C.primaryFixedDim,
+      borderRadius: 4,
+      marginTop: 2,
+    },
 
-  /* Bouncing badge */
-  badge: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: C.secondary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: C.secondary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.5,
-    shadowRadius: 6,
-    elevation: 6,
-  },
-  badgeText: {
-    color: C.onSecondary,
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
+    /* Bouncing badge */
+    badge: {
+      position: 'absolute',
+      top: 4,
+      right: 4,
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      backgroundColor: C.secondary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      shadowColor: C.secondary,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.5,
+      shadowRadius: 6,
+      elevation: 6,
+    },
+    badgeText: {
+      color: isDark ? '#5c1a00' : '#ffffff',
+      fontSize: 10,
+      fontWeight: '800',
+      letterSpacing: 0.5,
+    },
 
-  /* Title */
-  title: {
-    fontSize: 56,
-    fontWeight: '800',
-    color: '#ffffff',
-    fontStyle: 'italic',
-    letterSpacing: -2,
-    lineHeight: 60,
-    textAlign: 'center',
-  },
+    /* Title */
+    title: {
+      fontSize: 56,
+      fontWeight: '800',
+      color: C.onSurface,
+      fontStyle: 'italic',
+      letterSpacing: -2,
+      lineHeight: 60,
+      textAlign: 'center',
+    },
 
-  /* Subtitle */
-  subtitle: {
-    fontSize: 17,
-    fontWeight: '500',
-    color: C.onSurfaceVariant,
-    textAlign: 'center',
-    lineHeight: 27,
-    maxWidth: 300,
-  },
+    /* Subtitle */
+    subtitle: {
+      fontSize: 17,
+      fontWeight: '500',
+      color: C.onSurfaceVariant,
+      textAlign: 'center',
+      lineHeight: 27,
+      maxWidth: 300,
+    },
 
-  /* CTA area */
-  cta: {
-    width: '100%',
-    gap: 12,
-  },
-  primaryBtn: {
-    width: '100%',
-    backgroundColor: C.primaryContainer,
-    paddingVertical: 18,
-    borderRadius: 9999,
-    alignItems: 'center',
-    shadowColor: '#96f996',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 22,
-    elevation: 12,
-  },
-  primaryBtnText: {
-    color: C.onPrimaryContainer,
-    fontSize: 20,
-    fontWeight: '700',
-    letterSpacing: 0.3,
-  },
-  secondaryBtn: {
-    width: '100%',
-    backgroundColor: 'transparent',
-    borderWidth: 2,
-    borderColor: C.outlineVariant,
-    paddingVertical: 18,
-    borderRadius: 9999,
-    alignItems: 'center',
-  },
-  secondaryBtnText: {
-    color: C.secondaryFixed,
-    fontSize: 20,
-    fontWeight: '700',
-    letterSpacing: 0.3,
-  },
-});
+    /* CTA area */
+    cta: {
+      width: '100%',
+      gap: 12,
+    },
+    primaryBtn: {
+      width: '100%',
+      backgroundColor: C.primaryContainer,
+      paddingVertical: 18,
+      borderRadius: 9999,
+      alignItems: 'center',
+      shadowColor: C.primaryContainer,
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.3,
+      shadowRadius: 22,
+      elevation: 12,
+    },
+    primaryBtnText: {
+      color: C.onPrimaryContainer,
+      fontSize: 20,
+      fontWeight: '700',
+      letterSpacing: 0.3,
+    },
+    secondaryBtn: {
+      width: '100%',
+      backgroundColor: 'transparent',
+      borderWidth: 2,
+      borderColor: C.outlineVariant,
+      paddingVertical: 18,
+      borderRadius: 9999,
+      alignItems: 'center',
+    },
+    secondaryBtnText: {
+      color: C.secondaryFixed,
+      fontSize: 20,
+      fontWeight: '700',
+      letterSpacing: 0.3,
+    },
+  });
+}

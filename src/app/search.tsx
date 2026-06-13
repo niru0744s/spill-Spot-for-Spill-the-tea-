@@ -49,28 +49,14 @@ import { useSearch } from '@/hooks/useSearch';
 import type { SearchUser } from '@/hooks/useSearch';
 import { isUserOnline, getMillis } from '@/services/presenceService';
 import { triggerSelection } from '@/services/hapticService';
+import { useTheme, useStyles } from '@/hooks/useTheme';
+import { ThemeColors } from '@/types/theme';
 
 const { width, height } = Dimensions.get('window');
 
-/* ── Design tokens ─────────────────────────────────────────── */
-const C = {
-  background:         '#0f150e',
-  surfaceContainer:   '#1b211a',
-  surfaceContainerHigh: '#262b24',
-  surfaceVariant:     '#31362f',
-  primaryContainer:   '#96f996',
-  onPrimaryContainer: '#037524',
-  primaryFixedDim:    '#7adc7d',
-  secondary:          '#ffb59c',
-  secondaryContainer: '#8e2c01',
-  onSurface:          '#dfe4d9',
-  onSurfaceVariant:   '#becab9',
-  outlineVariant:     '#3f4a3d',
-  white:              '#ffffff',
-};
-
 /* ── Ambient orb background ────────────────────────────────── */
 function AmbientOrbs() {
+  const styles = useStyles(getStyles);
   const orb1 = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
   const orb2 = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
   const orb3 = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
@@ -100,6 +86,8 @@ function AmbientOrbs() {
 
 /* ── "Find your tea vibe." headline ────────────────────────── */
 function HeroHeadline() {
+  const { colors: C } = useTheme();
+  const styles = useStyles(getStyles);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -137,6 +125,8 @@ function SearchBar({
   onChangeText: (t: string) => void;
   onSubmit: () => void;
 }) {
+  const { colors: C } = useTheme();
+  const styles = useStyles(getStyles);
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const glowAnim  = useRef(new Animated.Value(0)).current;
 
@@ -184,6 +174,8 @@ function SearchBar({
 
 /* ── User result card ──────────────────────────────────────── */
 const UserCard = memo(function UserCard({ user, index }: { user: SearchUser; index: number }) {
+  const { colors: C } = useTheme();
+  const styles = useStyles(getStyles);
   const slideAnim = useRef(new Animated.Value(24)).current;
   const fadeAnim  = useRef(new Animated.Value(0)).current;
 
@@ -310,6 +302,8 @@ export default function SearchScreen() {
   const router    = useRouter();
   const insets    = useSafeAreaInsets();
   const { results, isSearching, error, search, clearResults } = useSearch();
+  const { colors: C } = useTheme();
+  const styles = useStyles(getStyles);
 
   const [query, setQuery] = useState('');
   const hasQuery = query.trim().length > 0;
@@ -406,7 +400,8 @@ export default function SearchScreen() {
 }
 
 /* ── StyleSheet ─────────────────────────────────────────────── */
-const styles = StyleSheet.create({
+function getStyles(C: ThemeColors, isDark: boolean) {
+  return StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: C.background,
@@ -428,7 +423,7 @@ const styles = StyleSheet.create({
   orb2: {
     width: 360,
     height: 360,
-    backgroundColor: '#8e2c01', // peach-secondary
+    backgroundColor: C.secondaryContainer,
     bottom: '18%',
     right: -100,
     opacity: 0.08,
@@ -449,9 +444,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingBottom: 10,
-    backgroundColor: 'rgba(15,21,14,0.75)',
+    backgroundColor: isDark ? 'rgba(15,21,14,0.75)' : 'rgba(244,250,243,0.75)',
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
+    borderBottomColor: C.outlineVariant,
     zIndex: 10,
   },
   backBtn: {
@@ -508,14 +503,14 @@ const styles = StyleSheet.create({
   searchWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(38,43,36,0.85)',
+    backgroundColor: C.inputBg,
     borderRadius: 9999,
     borderWidth: 1.5,
     paddingHorizontal: 16,
     paddingVertical: 10,
     gap: 10,
     width: '100%',
-    shadowColor: '#96f996',
+    shadowColor: C.primaryContainer,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0,
     shadowRadius: 16,
@@ -537,7 +532,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
-    shadowColor: '#96f996',
+    shadowColor: C.primaryContainer,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.45,
     shadowRadius: 12,
@@ -586,10 +581,10 @@ const styles = StyleSheet.create({
 
   /* ── User card ──────────────────────────────────────────────── */
   card: {
-    backgroundColor: 'rgba(27,33,26,0.7)',
+    backgroundColor: C.cardBg,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: C.cardBorder,
     padding: 18,
     gap: 12,
     overflow: 'hidden',
@@ -602,7 +597,7 @@ const styles = StyleSheet.create({
   },
   cardGlow: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(150,249,150,0.03)',
+    backgroundColor: isDark ? 'rgba(150,249,150,0.03)' : 'rgba(46,168,71,0.03)',
     borderRadius: 20,
   },
 
@@ -623,15 +618,15 @@ const styles = StyleSheet.create({
     height: 60,
     borderRadius: 30,
     borderWidth: 2,
-    borderColor: 'rgba(122,220,125,0.4)',
+    borderColor: C.outlineVariant,
   },
   avatarFallback: {
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: 'rgba(122,220,125,0.15)',
+    backgroundColor: C.surfaceContainer,
     borderWidth: 2,
-    borderColor: 'rgba(122,220,125,0.35)',
+    borderColor: C.outlineVariant,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -650,7 +645,7 @@ const styles = StyleSheet.create({
     borderRadius: 7,
     backgroundColor: C.primaryContainer,
     borderWidth: 2,
-    borderColor: '#1b211a',
+    borderColor: C.background,
     shadowColor: C.primaryContainer,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.9,
@@ -714,7 +709,7 @@ const styles = StyleSheet.create({
     backgroundColor: C.primaryContainer,
     borderRadius: 9999,
     paddingVertical: 13,
-    shadowColor: '#96f996',
+    shadowColor: C.primaryContainer,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.3,
     shadowRadius: 14,
@@ -735,3 +730,4 @@ const styles = StyleSheet.create({
     color: C.onSurfaceVariant,
   },
 });
+}

@@ -18,19 +18,14 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBannerStore } from '@/store/bannerStore';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useTheme } from '@/hooks/useTheme';
+import { ThemeColors } from '@/types/theme';
 
 const { width } = Dimensions.get('window');
 
-const C = {
-  background: '#1b211a', // surfaceContainer
-  outlineVariant: 'rgba(150, 249, 150, 0.25)', // matcha border tint
-  primary: '#96f996', // matcha primary
-  onSurface: '#dfe4d9',
-  onSurfaceVariant: '#becab9',
-  white: '#ffffff',
-};
-
 export function InAppBanner() {
+  const { colors: C, isDark } = useTheme();
+  const styles = getStyles(C, isDark);
   const insets = useSafeAreaInsets();
   const { visible, title, message, photoURL, onPress, hideBanner } = useBannerStore();
   
@@ -132,7 +127,7 @@ export function InAppBanner() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (C: ThemeColors, isDark: boolean) => StyleSheet.create({
   bannerContainer: {
     position: 'absolute',
     left: 0,
@@ -146,13 +141,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: width - 32,
     padding: 12,
-    backgroundColor: 'rgba(27, 33, 26, 0.95)', // glassmorphic surface
+    backgroundColor: isDark ? 'rgba(27, 33, 26, 0.95)' : 'rgba(234, 242, 232, 0.95)', // glassmorphic surface
     borderWidth: 1,
-    borderColor: C.outlineVariant,
+    borderColor: isDark ? 'rgba(150, 249, 150, 0.25)' : 'rgba(46, 168, 71, 0.25)',
     borderRadius: 20,
     gap: 12,
     // Soft matcha green glow
-    shadowColor: C.primary,
+    shadowColor: C.primaryFixedDim,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.18,
     shadowRadius: 14,
@@ -172,16 +167,16 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(122,220,125,0.15)',
+    backgroundColor: isDark ? 'rgba(122,220,125,0.15)' : 'rgba(46,168,71,0.15)',
     borderWidth: 1,
-    borderColor: 'rgba(122,220,125,0.3)',
+    borderColor: isDark ? 'rgba(122,220,125,0.3)' : 'rgba(46,168,71,0.3)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarInitial: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#7adc7d',
+    color: C.primaryFixedDim,
   },
   contentWrap: {
     flex: 1,
@@ -192,7 +187,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 14,
     fontWeight: '800',
-    color: C.white,
+    color: C.onSurface,
     fontFamily: 'Sora',
   },
   message: {
@@ -206,6 +201,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
   },
 });

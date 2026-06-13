@@ -22,8 +22,10 @@ import * as Notifications from "expo-notifications";
 import { Stack, useRouter, useSegments, useRootNavigationState } from "expo-router";
 import { useEffect } from "react";
 import { ActivityIndicator, StatusBar, View } from "react-native";
+import { ThemeProvider } from "@/context/ThemeContext";
+import { useTheme } from "@/hooks/useTheme";
 
-export default function RootLayout() {
+function RootLayoutContent() {
   const { isInitialized, firebaseUser, user } = useAuth();
   const segments = useSegments();
   const router = useRouter();
@@ -122,18 +124,20 @@ export default function RootLayout() {
     }
   }, [firebaseUser, user, isInitialized, segments, rootNavigationState?.key]);
 
+  const { colors, isDark } = useTheme();
+
   if (!isInitialized) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#0f150e', justifyContent: 'center', alignItems: 'center' }}>
-        <StatusBar hidden />
-        <ActivityIndicator size="large" color="#96f996" />
+      <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
+        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
+        <ActivityIndicator size="large" color={colors.primaryFixedDim} />
       </View>
     );
   }
 
   return (
     <>
-      <StatusBar hidden />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(onboarding)" />
@@ -150,5 +154,13 @@ export default function RootLayout() {
       <InAppBanner />
       <CallScreen />
     </>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <ThemeProvider>
+      <RootLayoutContent />
+    </ThemeProvider>
   );
 }

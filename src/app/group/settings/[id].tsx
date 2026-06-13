@@ -21,22 +21,12 @@ import { auth, db } from '@/config/firebase';
 import { useSearch, type SearchUser } from '@/hooks/useSearch';
 import { uploadGroupPhotoToSupabase } from '@/services/supabaseService';
 import { doc, getDoc, setDoc, updateDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
-
-const C = {
-  background: '#0f150e',
-  surfaceContainer: '#1b211a',
-  surfaceContainerHigh: '#262b24',
-  primaryFixed: '#96f996',
-  primaryFixedDim: '#7adc7d',
-  secondary: '#ffb59c',
-  onSurface: '#dfe4d9',
-  onSurfaceVariant: '#becab9',
-  outlineVariant: '#3f4a3d',
-  errorColor: '#ff6b6b',
-  white: '#ffffff',
-};
+import { useTheme, useStyles } from '@/hooks/useTheme';
+import { ThemeColors } from '@/types/theme';
 
 export default function GroupSettingsScreen() {
+  const { colors: C, isDark } = useTheme();
+  const styles = useStyles(getStyles);
   const router = useRouter();
   const { id: groupId } = useLocalSearchParams<{ id: string }>();
 
@@ -426,7 +416,7 @@ export default function GroupSettingsScreen() {
             )}
             {isAdmin && (
               <View style={styles.avatarEditOverlay}>
-                <MaterialIcons name="camera-alt" size={16} color={C.background} />
+                <MaterialIcons name="camera-alt" size={16} color={isDark ? '#380c00' : '#0f150e'} />
               </View>
             )}
           </TouchableOpacity>
@@ -638,7 +628,7 @@ export default function GroupSettingsScreen() {
                             style={styles.userAddBtn}
                             onPress={() => handleAddMember(user)}
                           >
-                            <MaterialIcons name="add" size={18} color={C.background} />
+                            <MaterialIcons name="add" size={18} color={C.onPrimaryFixed} />
                           </TouchableOpacity>
                         )}
                       </View>
@@ -656,384 +646,386 @@ export default function GroupSettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: C.background,
-  },
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: C.background,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderColor: 'rgba(255,255,255,0.03)',
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: C.surfaceContainer,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingLeft: 6,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: C.white,
-    letterSpacing: -0.5,
-  },
-  scrollContent: {
-    paddingBottom: 40,
-  },
-  avatarSection: {
-    alignItems: 'center',
-    marginTop: 24,
-  },
-  avatarWrapper: {
-    width: 110,
-    height: 110,
-    borderRadius: 55,
-    backgroundColor: C.surfaceContainer,
-    borderWidth: 2,
-    borderColor: 'rgba(255,181,156,0.3)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  avatarAdminEdit: {
-    borderColor: C.secondary,
-  },
-  avatarImg: {
-    width: 110,
-    height: 110,
-  },
-  avatarPlaceholder: {
-    width: 110,
-    height: 110,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarInitial: {
-    fontSize: 36,
-    fontWeight: '800',
-    color: C.secondary,
-  },
-  avatarEditOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    width: '100%',
-    height: 30,
-    backgroundColor: 'rgba(255,181,156,0.85)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingBottom: 4,
-  },
-  infoCard: {
-    marginHorizontal: 20,
-    backgroundColor: C.surfaceContainer,
-    borderRadius: 20,
-    padding: 16,
-    marginTop: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.03)',
-  },
-  infoTitleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  groupNameText: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: C.white,
-    flex: 1,
-    paddingRight: 12,
-  },
-  groupDescText: {
-    fontSize: 14,
-    color: C.onSurfaceVariant,
-    lineHeight: 20,
-  },
-  cardLabel: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: C.secondary,
-    letterSpacing: 1.5,
-    marginBottom: 6,
-  },
-  textInput: {
-    backgroundColor: C.surfaceContainerHigh,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-    color: C.white,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  textArea: {
-    height: 80,
-    textAlignVertical: 'top',
-  },
-  editActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 12,
-    marginTop: 14,
-  },
-  saveBtn: {
-    backgroundColor: C.secondary,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 10,
-  },
-  saveBtnText: {
-    fontSize: 13,
-    fontWeight: '900',
-    color: C.background,
-  },
-  cancelBtn: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 10,
-  },
-  cancelBtnText: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: C.white,
-  },
-  rosterHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    marginTop: 28,
-    marginBottom: 10,
-  },
-  sectionLabel: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: C.secondary,
-    letterSpacing: 1.5,
-  },
-  addMemberBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  addMemberBtnText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: C.primaryFixedDim,
-  },
-  rosterList: {
-    marginHorizontal: 20,
-    gap: 8,
-  },
-  memberCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: C.surfaceContainer,
-    borderRadius: 16,
-    padding: 12,
-    gap: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.02)',
-  },
-  memberAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: C.surfaceContainerHigh,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  memberAvatarImg: {
-    width: 40,
-    height: 40,
-  },
-  memberAvatarText: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: C.primaryFixedDim,
-  },
-  memberName: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: C.white,
-  },
-  memberUsername: {
-    fontSize: 12,
-    color: C.onSurfaceVariant,
-  },
-  roleBadge: {
-    backgroundColor: 'rgba(255,181,156,0.15)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  roleBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: C.secondary,
-  },
-  actionsRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  actionIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: C.surfaceContainerHigh,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  leaveSection: {
-    paddingHorizontal: 20,
-    marginTop: 36,
-  },
-  leaveBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,107,107,0.08)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,107,107,0.2)',
-    borderRadius: 16,
-    height: 52,
-    gap: 8,
-  },
-  leaveBtnText: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: C.errorColor,
-  },
+function getStyles(C: ThemeColors, isDark: boolean) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: C.background,
+    },
+    loadingContainer: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: C.background,
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      borderBottomWidth: 1,
+      borderColor: 'rgba(255,255,255,0.03)',
+    },
+    backBtn: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: C.surfaceContainer,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingLeft: 6,
+    },
+    headerTitle: {
+      fontSize: 20,
+      fontWeight: '800',
+      color: C.white,
+      letterSpacing: -0.5,
+    },
+    scrollContent: {
+      paddingBottom: 40,
+    },
+    avatarSection: {
+      alignItems: 'center',
+      marginTop: 24,
+    },
+    avatarWrapper: {
+      width: 110,
+      height: 110,
+      borderRadius: 55,
+      backgroundColor: C.surfaceContainer,
+      borderWidth: 2,
+      borderColor: 'rgba(255,181,156,0.3)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      position: 'relative',
+      overflow: 'hidden',
+    },
+    avatarAdminEdit: {
+      borderColor: C.secondary,
+    },
+    avatarImg: {
+      width: 110,
+      height: 110,
+    },
+    avatarPlaceholder: {
+      width: 110,
+      height: 110,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    avatarInitial: {
+      fontSize: 36,
+      fontWeight: '800',
+      color: C.secondary,
+    },
+    avatarEditOverlay: {
+      position: 'absolute',
+      bottom: 0,
+      width: '100%',
+      height: 30,
+      backgroundColor: 'rgba(255,181,156,0.85)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingBottom: 4,
+    },
+    infoCard: {
+      marginHorizontal: 20,
+      backgroundColor: C.surfaceContainer,
+      borderRadius: 20,
+      padding: 16,
+      marginTop: 24,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.03)',
+    },
+    infoTitleRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 6,
+    },
+    groupNameText: {
+      fontSize: 20,
+      fontWeight: '800',
+      color: C.white,
+      flex: 1,
+      paddingRight: 12,
+    },
+    groupDescText: {
+      fontSize: 14,
+      color: C.onSurfaceVariant,
+      lineHeight: 20,
+    },
+    cardLabel: {
+      fontSize: 10,
+      fontWeight: '800',
+      color: C.secondary,
+      letterSpacing: 1.5,
+      marginBottom: 6,
+    },
+    textInput: {
+      backgroundColor: C.surfaceContainerHigh,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.05)',
+      color: C.white,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      fontSize: 15,
+      fontWeight: '600',
+    },
+    textArea: {
+      height: 80,
+      textAlignVertical: 'top',
+    },
+    editActions: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      gap: 12,
+      marginTop: 14,
+    },
+    saveBtn: {
+      backgroundColor: C.secondary,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 10,
+    },
+    saveBtnText: {
+      fontSize: 13,
+      fontWeight: '900',
+      color: isDark ? '#380c00' : '#ffffff',
+    },
+    cancelBtn: {
+      backgroundColor: 'rgba(255,255,255,0.06)',
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 10,
+    },
+    cancelBtnText: {
+      fontSize: 13,
+      fontWeight: '800',
+      color: C.white,
+    },
+    rosterHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+      marginTop: 28,
+      marginBottom: 10,
+    },
+    sectionLabel: {
+      fontSize: 11,
+      fontWeight: '800',
+      color: C.secondary,
+      letterSpacing: 1.5,
+    },
+    addMemberBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+    },
+    addMemberBtnText: {
+      fontSize: 12,
+      fontWeight: '800',
+      color: C.primaryFixedDim,
+    },
+    rosterList: {
+      marginHorizontal: 20,
+      gap: 8,
+    },
+    memberCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: C.surfaceContainer,
+      borderRadius: 16,
+      padding: 12,
+      gap: 12,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.02)',
+    },
+    memberAvatar: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: C.surfaceContainerHigh,
+      alignItems: 'center',
+      justifyContent: 'center',
+      overflow: 'hidden',
+    },
+    memberAvatarImg: {
+      width: 40,
+      height: 40,
+    },
+    memberAvatarText: {
+      fontSize: 16,
+      fontWeight: '800',
+      color: C.primaryFixedDim,
+    },
+    memberName: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: C.white,
+    },
+    memberUsername: {
+      fontSize: 12,
+      color: C.onSurfaceVariant,
+    },
+    roleBadge: {
+      backgroundColor: 'rgba(255,181,156,0.15)',
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 6,
+    },
+    roleBadgeText: {
+      fontSize: 10,
+      fontWeight: '800',
+      color: C.secondary,
+    },
+    actionsRow: {
+      flexDirection: 'row',
+      gap: 10,
+    },
+    actionIcon: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: C.surfaceContainerHigh,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    leaveSection: {
+      paddingHorizontal: 20,
+      marginTop: 36,
+    },
+    leaveBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(255,107,107,0.08)',
+      borderWidth: 1.5,
+      borderColor: 'rgba(255,107,107,0.2)',
+      borderRadius: 16,
+      height: 52,
+      gap: 8,
+    },
+    leaveBtnText: {
+      fontSize: 14,
+      fontWeight: '800',
+      color: C.errorColor,
+    },
 
-  /* ── Modal Styles ────────────────────────────────────────── */
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(15,21,14,0.9)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    flex: 0.9,
-    backgroundColor: C.background,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 18,
-    borderBottomWidth: 1,
-    borderColor: 'rgba(255,255,255,0.03)',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: C.white,
-  },
-  modalCloseBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: C.surfaceContainer,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalSearchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: C.surfaceContainer,
-    borderRadius: 14,
-    marginHorizontal: 16,
-    marginTop: 16,
-    paddingHorizontal: 14,
-    height: 48,
-    gap: 10,
-  },
-  modalSearchInput: {
-    flex: 1,
-    color: C.white,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  modalUserCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: C.surfaceContainer,
-    borderRadius: 16,
-    padding: 12,
-    gap: 12,
-  },
-  modalUserAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: C.surfaceContainerHigh,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  modalUserAvatarImg: {
-    width: 40,
-    height: 40,
-  },
-  modalUserAvatarText: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: C.primaryFixedDim,
-  },
-  modalUserName: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: C.white,
-  },
-  modalUserSub: {
-    fontSize: 12,
-    color: C.onSurfaceVariant,
-  },
-  userAddBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: C.primaryFixed,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  memberTag: {
-    backgroundColor: 'rgba(122,220,125,0.15)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  memberTagText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: C.primaryFixedDim,
-  },
-  modalEmptyText: {
-    color: C.onSurfaceVariant,
-    fontSize: 14,
-    textAlign: 'center',
-    marginTop: 40,
-  },
-});
+    /* ── Modal Styles ────────────────────────────────────────── */
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(15,21,14,0.9)',
+      justifyContent: 'flex-end',
+    },
+    modalContent: {
+      flex: 0.9,
+      backgroundColor: C.background,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: 18,
+      borderBottomWidth: 1,
+      borderColor: 'rgba(255,255,255,0.03)',
+    },
+    modalTitle: {
+      fontSize: 18,
+      fontWeight: '800',
+      color: C.white,
+    },
+    modalCloseBtn: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: C.surfaceContainer,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    modalSearchBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: C.surfaceContainer,
+      borderRadius: 14,
+      marginHorizontal: 16,
+      marginTop: 16,
+      paddingHorizontal: 14,
+      height: 48,
+      gap: 10,
+    },
+    modalSearchInput: {
+      flex: 1,
+      color: C.white,
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    modalUserCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: C.surfaceContainer,
+      borderRadius: 16,
+      padding: 12,
+      gap: 12,
+    },
+    modalUserAvatar: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: C.surfaceContainerHigh,
+      alignItems: 'center',
+      justifyContent: 'center',
+      overflow: 'hidden',
+    },
+    modalUserAvatarImg: {
+      width: 40,
+      height: 40,
+    },
+    modalUserAvatarText: {
+      fontSize: 16,
+      fontWeight: '800',
+      color: C.primaryFixedDim,
+    },
+    modalUserName: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: C.white,
+    },
+    modalUserSub: {
+      fontSize: 12,
+      color: C.onSurfaceVariant,
+    },
+    userAddBtn: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: C.primaryFixed,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    memberTag: {
+      backgroundColor: 'rgba(122,220,125,0.15)',
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 6,
+    },
+    memberTagText: {
+      fontSize: 11,
+      fontWeight: '800',
+      color: C.primaryFixedDim,
+    },
+    modalEmptyText: {
+      color: C.onSurfaceVariant,
+      fontSize: 14,
+      textAlign: 'center',
+      marginTop: 40,
+    },
+  });
+}

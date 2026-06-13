@@ -25,6 +25,8 @@ import { uploadGroupPhotoToSupabase } from '@/services/supabaseService';
 import { db } from '@/config/firebase';
 import { doc, setDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { randomUUID } from 'expo-crypto';
+import { useTheme, useStyles } from '@/hooks/useTheme';
+import { ThemeColors } from '@/types/theme';
 
 function safeRandomUUID(): string {
   try {
@@ -39,19 +41,6 @@ function safeRandomUUID(): string {
 }
 
 const { width } = Dimensions.get('window');
-
-const C = {
-  background: '#0f150e',
-  surfaceContainer: '#1b211a',
-  surfaceContainerHigh: '#262b24',
-  primaryFixedDim: '#7adc7d',
-  secondary: '#ffb59c',
-  onSurface: '#dfe4d9',
-  onSurfaceVariant: '#becab9',
-  outlineVariant: '#3f4a3d',
-  white: '#ffffff',
-  error: '#ffb4ab',
-};
 
 /* ── Tactile Squish Button ─────────────────────────────────── */
 function SquishButton({
@@ -92,6 +81,8 @@ function SquishButton({
 }
 
 export default function CreateGroupScreen() {
+  const { colors: C, isDark } = useTheme();
+  const styles = useStyles(getStyles);
   const router = useRouter();
   const firebaseUser = useAuthStore((s) => s.firebaseUser);
 
@@ -436,7 +427,8 @@ export default function CreateGroupScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function getStyles(C: ThemeColors, isDark: boolean) {
+  return StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: C.background,
@@ -448,7 +440,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderColor: 'rgba(255,255,255,0.03)',
+    borderColor: C.outlineVariant,
   },
   backBtn: {
     width: 40,
@@ -462,7 +454,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: '800',
-    color: C.white,
+    color: C.onSurface,
     letterSpacing: -0.5,
   },
   scrollContent: {
@@ -479,7 +471,7 @@ const styles = StyleSheet.create({
     borderRadius: 50,
     backgroundColor: C.surfaceContainer,
     borderWidth: 2,
-    borderColor: 'rgba(255,181,156,0.3)',
+    borderColor: C.secondary,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
@@ -493,7 +485,7 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: 'rgba(255,181,156,0.05)',
+    backgroundColor: C.inputBg,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -532,8 +524,8 @@ const styles = StyleSheet.create({
     backgroundColor: C.surfaceContainer,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-    color: C.white,
+    borderColor: C.outlineVariant,
+    color: C.onSurface,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 15,
@@ -553,14 +545,14 @@ const styles = StyleSheet.create({
     backgroundColor: C.surfaceContainer,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    borderColor: C.outlineVariant,
     paddingHorizontal: 14,
     gap: 10,
     height: 48,
   },
   searchInput: {
     flex: 1,
-    color: C.white,
+    color: C.onSurface,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -581,13 +573,13 @@ const styles = StyleSheet.create({
   selectedChipText: {
     fontSize: 12,
     fontWeight: '800',
-    color: C.background,
+    color: isDark ? '#380c00' : '#ffffff',
   },
   chipRemove: {
     width: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: 'rgba(15,21,14,0.15)',
+    backgroundColor: isDark ? 'rgba(15,21,14,0.15)' : 'rgba(255,255,255,0.35)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -603,11 +595,11 @@ const styles = StyleSheet.create({
     padding: 12,
     gap: 12,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.02)',
+    borderColor: C.cardBorder,
   },
   resultCardSelected: {
-    borderColor: 'rgba(122,220,125,0.2)',
-    backgroundColor: 'rgba(122,220,125,0.03)',
+    borderColor: C.primary,
+    backgroundColor: isDark ? 'rgba(122,220,125,0.03)' : 'rgba(46,168,71,0.03)',
   },
   resultAvatar: {
     width: 40,
@@ -630,7 +622,7 @@ const styles = StyleSheet.create({
   resultName: {
     fontSize: 14,
     fontWeight: '700',
-    color: C.white,
+    color: C.onSurface,
   },
   resultFullName: {
     fontSize: 12,
@@ -664,7 +656,8 @@ const styles = StyleSheet.create({
   submitBtnText: {
     fontSize: 16,
     fontWeight: '900',
-    color: C.background,
+    color: isDark ? '#380c00' : '#ffffff',
     letterSpacing: 0.5,
   },
 });
+}

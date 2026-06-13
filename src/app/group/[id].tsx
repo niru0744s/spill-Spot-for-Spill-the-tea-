@@ -22,27 +22,14 @@ import { auth, db } from '@/config/firebase';
 import { useGroupChat } from '@/hooks/useGroupChat';
 import { clearUnread, type StoredMessage } from '@/services/chatStorage';
 import { doc, onSnapshot, updateDoc, deleteDoc } from 'firebase/firestore';
+import { useTheme, useStyles } from '@/hooks/useTheme';
+import { ThemeColors } from '@/types/theme';
 
 const { width } = Dimensions.get('window');
 
-const C = {
-  background: '#0f150e',
-  surfaceContainer: '#1b211a',
-  surfaceContainerHigh: '#262b24',
-  surfaceContainerHighest: '#31362f',
-  primaryFixed: '#96f996',
-  primaryFixedDim: '#7adc7d',
-  secondary: '#ffb59c',
-  onSurface: '#dfe4d9',
-  onSurfaceVariant: '#becab9',
-  outlineVariant: '#3f4a3d',
-  errorColor: '#ff6b6b',
-  white: '#ffffff',
-  onPrimaryFixed: '#002105',
-};
-
 /* ── Date Divider ──────────────────────────────────── */
 function DateDivider({ label }: { label: string }) {
+  const styles = useStyles(getStyles);
   return (
     <View style={styles.dateDividerRow}>
       <Text style={styles.dateDividerText}>{label}</Text>
@@ -58,6 +45,8 @@ function GroupMessageBubble({
   item: StoredMessage;
   prevItem?: StoredMessage;
 }) {
+  const { colors: C } = useTheme();
+  const styles = useStyles(getStyles);
   const isGrouped =
     prevItem &&
     prevItem.senderUid === item.senderUid &&
@@ -123,6 +112,8 @@ function GroupMessageBubble({
 }
 
 export default function GroupChatRoomScreen() {
+  const { colors: C } = useTheme();
+  const styles = useStyles(getStyles);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { id: groupId } = useLocalSearchParams<{ id: string }>();
@@ -367,7 +358,8 @@ export default function GroupChatRoomScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+function getStyles(C: ThemeColors, isDark: boolean) {
+  return StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: C.background,
@@ -378,7 +370,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderColor: 'rgba(255,255,255,0.03)',
+    borderColor: C.outlineVariant,
     backgroundColor: C.background,
   },
   backBtn: {
@@ -423,7 +415,7 @@ const styles = StyleSheet.create({
   groupName: {
     fontSize: 16,
     fontWeight: '700',
-    color: C.white,
+    color: C.onSurface,
   },
   memberCount: {
     fontSize: 11,
@@ -450,7 +442,7 @@ const styles = StyleSheet.create({
   offlineText: {
     fontSize: 12,
     fontWeight: '700',
-    color: C.background,
+    color: isDark ? '#002105' : '#ffffff',
   },
   messageList: {
     paddingHorizontal: 16,
@@ -487,7 +479,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   bubbleOut: {
-    backgroundColor: C.primaryFixed,
+    backgroundColor: C.primary,
   },
   bubbleIn: {
     backgroundColor: C.surfaceContainerHigh,
@@ -501,7 +493,7 @@ const styles = StyleSheet.create({
   bubbleTextOut: {
     fontSize: 15,
     fontWeight: '500',
-    color: C.onPrimaryFixed,
+    color: isDark ? '#002105' : '#ffffff',
     lineHeight: 20,
   },
   bubbleTextIn: {
@@ -580,14 +572,14 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     backgroundColor: C.background,
     borderTopWidth: 1,
-    borderColor: 'rgba(255,255,255,0.03)',
+    borderColor: C.outlineVariant,
     gap: 10,
   },
   input: {
     flex: 1,
     backgroundColor: C.surfaceContainer,
     borderRadius: 22,
-    color: C.white,
+    color: C.onSurface,
     paddingHorizontal: 16,
     paddingTop: Platform.OS === 'ios' ? 10 : 8,
     paddingBottom: Platform.OS === 'ios' ? 10 : 8,
@@ -599,7 +591,7 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: C.primaryFixed,
+    backgroundColor: C.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -612,7 +604,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: C.surfaceContainer,
     borderTopWidth: 1,
-    borderColor: 'rgba(255,181,156,0.15)',
+    borderColor: C.outlineVariant,
     paddingHorizontal: 16,
     paddingTop: 16,
     gap: 12,
@@ -629,9 +621,9 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   deleteBtn: {
-    backgroundColor: 'rgba(255,107,107,0.15)',
+    backgroundColor: isDark ? 'rgba(255,107,107,0.15)' : 'rgba(211,47,47,0.15)',
     borderWidth: 1.5,
-    borderColor: 'rgba(255,107,107,0.3)',
+    borderColor: isDark ? 'rgba(255,107,107,0.3)' : 'rgba(211,47,47,0.3)',
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 10,
@@ -642,3 +634,4 @@ const styles = StyleSheet.create({
     color: C.errorColor,
   },
 });
+}

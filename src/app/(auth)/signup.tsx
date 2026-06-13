@@ -33,34 +33,14 @@ import {
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAuth } from '@/hooks/useAuth';
+import { useTheme, useStyles } from '@/hooks/useTheme';
+import { ThemeColors } from '@/types/theme';
 
 const { width, height } = Dimensions.get('window');
 
-/* ── Design tokens ─────────────────────────────────────────── */
-const C = {
-  background:         '#0f150e',
-  surface:            '#1b211a',
-  surfaceCard:        'rgba(255,255,255,0.04)',
-  cardBorder:         'rgba(255,255,255,0.10)',
-  primaryContainer:   '#96f996',   // matcha green
-  onPrimaryContainer: '#037524',   // dark text on matcha
-  primaryFixedDim:    '#7adc7d',
-  secondary:          '#ffb59c',   // peach badge
-  onSecondary:        '#5c1a00',
-  onSurface:          '#dfe4d9',
-  onSurfaceVariant:   '#becab9',
-  inputBg:            'rgba(255,255,255,0.05)',
-  inputBorder:        'rgba(255,255,255,0.08)',
-  inputFocusBorder:   'rgba(150,249,150,0.45)',
-  inputFocusShadow:   'rgba(150,249,150,0.12)',
-  errorBg:            'rgba(239,68,68,0.10)',
-  errorBorder:        'rgba(239,68,68,0.25)',
-  errorText:          '#ef4444',
-  white:              '#ffffff',
-};
-
 /* ── Animated liquid drop blob ─────────────────────────────── */
 function LiquidBlob({ delay, x, size }: { delay: number; x: number; size: number }) {
+  const { colors: C } = useTheme();
   const y = useRef(new Animated.Value(-size)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
@@ -98,7 +78,7 @@ function LiquidBlob({ delay, x, size }: { delay: number; x: number; size: number
         width: size,
         height: size,
         borderRadius: size / 2,
-        backgroundColor: '#037524',
+        backgroundColor: C.primaryContainer,
         opacity,
         transform: [{ translateY: y }],
         pointerEvents: 'none',
@@ -109,6 +89,8 @@ function LiquidBlob({ delay, x, size }: { delay: number; x: number; size: number
 
 /* ── Mini coffee-cup logo (same as landing) ────────────────── */
 function CupLogo() {
+  const { colors: C, isDark } = useTheme();
+  const styles = useStyles(getStyles);
   const bounce = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -157,6 +139,8 @@ function GlassInput({
   autoCapitalize?: 'none' | 'words';
   delay: number;
 }) {
+  const { colors: C, isDark } = useTheme();
+  const styles = useStyles(getStyles);
   const [focused, setFocused] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
@@ -184,7 +168,7 @@ function GlassInput({
         <TextInput
           style={styles.input}
           placeholder={placeholder}
-          placeholderTextColor="rgba(255,255,255,0.28)"
+          placeholderTextColor={isDark ? 'rgba(255,255,255,0.28)' : 'rgba(75,87,71,0.35)'}
           value={value}
           onChangeText={onChangeText}
           secureTextEntry={secureTextEntry}
@@ -201,6 +185,8 @@ function GlassInput({
 
 /* ── Main Signup Screen ────────────────────────────────────── */
 export default function SignupScreen() {
+  const { colors: C, isDark } = useTheme();
+  const styles = useStyles(getStyles);
   const router = useRouter();
   const { signUp, error: authError } = useAuth();
 
@@ -269,6 +255,7 @@ export default function SignupScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} translucent backgroundColor="transparent" />
 
       {/* ── Liquid drop blobs ──────────────────────────────── */}
       {blobs.map((b, i) => (
@@ -392,234 +379,236 @@ export default function SignupScreen() {
 }
 
 /* ── StyleSheet ─────────────────────────────────────────────── */
-const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: C.background,
-  },
-  kav: {
-    flex: 1,
-  },
-  scroll: {
-    flexGrow: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 32,
-    paddingHorizontal: 20,
-  },
+function getStyles(C: ThemeColors, isDark: boolean) {
+  return StyleSheet.create({
+    safe: {
+      flex: 1,
+      backgroundColor: C.background,
+    },
+    kav: {
+      flex: 1,
+    },
+    scroll: {
+      flexGrow: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 32,
+      paddingHorizontal: 20,
+    },
 
-  /* Glass card */
-  card: {
-    width: '100%',
-    maxWidth: 440,
-    backgroundColor: C.surfaceCard,
-    borderRadius: 28,
-    borderWidth: 1,
-    borderColor: C.cardBorder,
-    paddingHorizontal: 24,
-    paddingVertical: 28,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 40 },
-    shadowOpacity: 0.6,
-    shadowRadius: 60,
-    elevation: 20,
-    gap: 20,
-  },
+    /* Glass card */
+    card: {
+      width: '100%',
+      maxWidth: 440,
+      backgroundColor: C.surfaceCard,
+      borderRadius: 28,
+      borderWidth: 1,
+      borderColor: C.cardBorder,
+      paddingHorizontal: 24,
+      paddingVertical: 28,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 40 },
+      shadowOpacity: isDark ? 0.6 : 0.15,
+      shadowRadius: 60,
+      elevation: 20,
+      gap: 20,
+    },
 
-  /* Logo */
-  logoSection: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  logoWrapper: {
-    position: 'relative',
-    width: 80,
-    height: 80,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cupOuter: {
-    alignItems: 'center',
-  },
-  cupRim: {
-    width: 52,
-    height: 6,
-    backgroundColor: C.primaryFixedDim,
-    borderRadius: 3,
-    marginBottom: 2,
-  },
-  cupRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  cupBody: {
-    width: 46,
-    height: 32,
-    backgroundColor: C.primaryFixedDim,
-    borderBottomLeftRadius: 8,
-    borderBottomRightRadius: 8,
-    borderTopLeftRadius: 2,
-    borderTopRightRadius: 2,
-  },
-  cupHandle: {
-    width: 12,
-    height: 20,
-    borderRadius: 8,
-    borderWidth: 3,
-    borderColor: C.primaryFixedDim,
-    backgroundColor: 'transparent',
-    marginLeft: -2,
-    marginTop: 4,
-  },
-  cupSaucer: {
-    width: 58,
-    height: 5,
-    backgroundColor: C.primaryFixedDim,
-    borderRadius: 3,
-    marginTop: 2,
-  },
-  badge: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: C.secondary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: C.background,
-  },
-  badgeText: {
-    color: C.onSecondary,
-    fontSize: 8,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  brandName: {
-    fontSize: 32,
-    fontWeight: '800',
-    fontStyle: 'italic',
-    color: C.white,
-    letterSpacing: -1.5,
-    marginTop: -4,
-  },
+    /* Logo */
+    logoSection: {
+      alignItems: 'center',
+      gap: 4,
+    },
+    logoWrapper: {
+      position: 'relative',
+      width: 80,
+      height: 80,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    cupOuter: {
+      alignItems: 'center',
+    },
+    cupRim: {
+      width: 52,
+      height: 6,
+      backgroundColor: C.primaryFixedDim,
+      borderRadius: 3,
+      marginBottom: 2,
+    },
+    cupRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    cupBody: {
+      width: 46,
+      height: 32,
+      backgroundColor: C.primaryFixedDim,
+      borderBottomLeftRadius: 8,
+      borderBottomRightRadius: 8,
+      borderTopLeftRadius: 2,
+      borderTopRightRadius: 2,
+    },
+    cupHandle: {
+      width: 12,
+      height: 20,
+      borderRadius: 8,
+      borderWidth: 3,
+      borderColor: C.primaryFixedDim,
+      backgroundColor: 'transparent',
+      marginLeft: -2,
+      marginTop: 4,
+    },
+    cupSaucer: {
+      width: 58,
+      height: 5,
+      backgroundColor: C.primaryFixedDim,
+      borderRadius: 3,
+      marginTop: 2,
+    },
+    badge: {
+      position: 'absolute',
+      top: 4,
+      right: 4,
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      backgroundColor: C.secondary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 2,
+      borderColor: C.background,
+    },
+    badgeText: {
+      color: isDark ? '#5c1a00' : '#ffffff',
+      fontSize: 8,
+      fontWeight: '800',
+      letterSpacing: 0.5,
+    },
+    brandName: {
+      fontSize: 32,
+      fontWeight: '800',
+      fontStyle: 'italic',
+      color: C.white,
+      letterSpacing: -1.5,
+      marginTop: -4,
+    },
 
-  /* Header */
-  headerSection: {
-    alignItems: 'center',
-    gap: 6,
-  },
-  headline: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: C.white,
-    letterSpacing: -0.5,
-    textAlign: 'center',
-  },
-  subheadline: {
-    fontSize: 15,
-    fontWeight: '400',
-    color: C.onSurfaceVariant,
-    textAlign: 'center',
-    opacity: 0.85,
-  },
+    /* Header */
+    headerSection: {
+      alignItems: 'center',
+      gap: 6,
+    },
+    headline: {
+      fontSize: 28,
+      fontWeight: '800',
+      color: C.white,
+      letterSpacing: -0.5,
+      textAlign: 'center',
+    },
+    subheadline: {
+      fontSize: 15,
+      fontWeight: '400',
+      color: C.onSurfaceVariant,
+      textAlign: 'center',
+      opacity: 0.85,
+    },
 
-  /* Error */
-  errorBox: {
-    backgroundColor: C.errorBg,
-    borderWidth: 1,
-    borderColor: C.errorBorder,
-    borderRadius: 14,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-  },
-  errorText: {
-    color: C.errorText,
-    fontSize: 14,
-    fontWeight: '500',
-    textAlign: 'center',
-  },
+    /* Error */
+    errorBox: {
+      backgroundColor: C.errorBg,
+      borderWidth: 1,
+      borderColor: C.errorBorder,
+      borderRadius: 14,
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+    },
+    errorText: {
+      color: C.errorText,
+      fontSize: 14,
+      fontWeight: '500',
+      textAlign: 'center',
+    },
 
-  /* Inputs */
-  inputsGroup: {
-    gap: 12,
-  },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: C.inputBg,
-    borderRadius: 9999,
-    borderWidth: 1,
-    borderColor: C.inputBorder,
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    gap: 12,
-  },
-  inputRowFocused: {
-    borderColor: C.inputFocusBorder,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-  },
-  // Icon styling handled directly via MaterialIcons color prop
-  input: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '400',
-    color: C.white,
-    padding: 0,
-  },
+    /* Inputs */
+    inputsGroup: {
+      gap: 12,
+    },
+    inputRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: C.inputBg,
+      borderRadius: 9999,
+      borderWidth: 1,
+      borderColor: C.inputBorder,
+      paddingHorizontal: 18,
+      paddingVertical: 14,
+      gap: 12,
+    },
+    inputRowFocused: {
+      borderColor: C.inputFocusBorder,
+      backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.03)',
+    },
+    // Icon styling handled directly via MaterialIcons color prop
+    input: {
+      flex: 1,
+      fontSize: 16,
+      fontWeight: '400',
+      color: C.white,
+      padding: 0,
+    },
 
-  /* CTA */
-  ctaBtn: {
-    width: '100%',
-    backgroundColor: C.primaryContainer,
-    paddingVertical: 17,
-    borderRadius: 9999,
-    alignItems: 'center',
-    shadowColor: '#96f996',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.35,
-    shadowRadius: 24,
-    elevation: 10,
-    marginTop: 4,
-  },
-  ctaBtnDisabled: {
-    opacity: 0.7,
-  },
-  ctaBtnText: {
-    color: C.onPrimaryContainer,
-    fontSize: 20,
-    fontWeight: '700',
-    letterSpacing: 0.2,
-  },
+    /* CTA */
+    ctaBtn: {
+      width: '100%',
+      backgroundColor: C.primaryContainer,
+      paddingVertical: 17,
+      borderRadius: 9999,
+      alignItems: 'center',
+      shadowColor: C.primaryContainer,
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.35,
+      shadowRadius: 24,
+      elevation: 10,
+      marginTop: 4,
+    },
+    ctaBtnDisabled: {
+      opacity: 0.7,
+    },
+    ctaBtnText: {
+      color: C.onPrimaryContainer,
+      fontSize: 20,
+      fontWeight: '700',
+      letterSpacing: 0.2,
+    },
 
-  /* Footer */
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingTop: 4,
-  },
-  footerText: {
-    color: C.onSurfaceVariant,
-    fontSize: 15,
-    fontWeight: '400',
-  },
-  footerLink: {
-    color: C.white,
-    fontSize: 15,
-    fontWeight: '700',
-  },
+    /* Footer */
+    footer: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingTop: 4,
+    },
+    footerText: {
+      color: C.onSurfaceVariant,
+      fontSize: 15,
+      fontWeight: '400',
+    },
+    footerLink: {
+      color: C.white,
+      fontSize: 15,
+      fontWeight: '700',
+    },
 
-  /* Bottom tagline */
-  tagline: {
-    marginTop: 28,
-    color: C.onSurfaceVariant,
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 3,
-    opacity: 0.35,
-    textAlign: 'center',
-  },
-});
+    /* Bottom tagline */
+    tagline: {
+      marginTop: 28,
+      color: C.onSurfaceVariant,
+      fontSize: 10,
+      fontWeight: '700',
+      letterSpacing: 3,
+      opacity: 0.35,
+      textAlign: 'center',
+    },
+  });
+}

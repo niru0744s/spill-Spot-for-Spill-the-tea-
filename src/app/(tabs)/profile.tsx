@@ -45,24 +45,8 @@ import { getAllChatIds, getMessages, clearLocalMessages } from '@/services/chatS
 
 const { width } = Dimensions.get('window');
 
-/* ── Design Tokens ──────────────────────────────────────────── */
-const C = {
-  background:               '#0f150e', // Deep Charcoal (Level 0)
-  surface:                  '#1b211a', // Level 1 Surface
-  surfaceContainerHigh:     '#262b24', // Level 2
-  surfaceContainerHighest:  '#31362f', // Level 3
-  primaryFixed:             '#96f996', // Matcha Green (Primary)
-  primaryFixedDim:          '#7adc7d', // Muted Matcha
-  onPrimaryFixed:           '#002105',
-  secondaryFixedDim:        '#ffb59c', // Bright Peach (Secondary)
-  onSecondaryFixed:         '#380c00',
-  onSurface:                '#dfe4d9', // Cream text
-  onSurfaceVariant:         '#becab9', // Muted Cream text
-  outlineVariant:           '#3f4a3d',
-  errorColor:               '#ffb4ab', // Peach error tint
-  errorContainer:           '#93000a',
-  white:                    '#ffffff',
-};
+import { useTheme, useStyles } from '@/hooks/useTheme';
+import { ThemeColors, ThemeMode } from '@/types/theme';
 
 /* ── Custom "Squish" Button ──────────────────────────────────── */
 function SquishButton({
@@ -114,6 +98,8 @@ function SquishButton({
 
 /* ── Profile Screen ─────────────────────────────────────────── */
 export default function ProfileScreen() {
+  const { colors: C, themeMode, setThemeMode, isDark } = useTheme();
+  const styles = useStyles(getStyles);
   const insets = useSafeAreaInsets();
   const { signOut, user, updateProfile, updateProfilePhoto, isLoading: authLoading } = useAuth();
 
@@ -368,12 +354,45 @@ export default function ProfileScreen() {
 
           <View style={styles.optionsRowDivider} />
 
+          {/* App Theme Selector */}
+          <View style={styles.optionRow}>
+            <View style={styles.optionInfo}>
+              <View style={[styles.optionIconBg, styles.matchaTint]}>
+                <MaterialIcons name="palette" size={20} color={C.primaryFixedDim} />
+              </View>
+              <Text style={styles.optionLabel}>App Theme</Text>
+            </View>
+            <View style={styles.themeSelector}>
+              {(['system', 'light', 'dark'] as const).map((mode) => (
+                <TouchableOpacity
+                  key={mode}
+                  style={[
+                    styles.themeOption,
+                    themeMode === mode && styles.themeOptionActive,
+                  ]}
+                  onPress={() => setThemeMode(mode)}
+                >
+                  <Text
+                    style={[
+                      styles.themeOptionText,
+                      themeMode === mode && styles.themeOptionTextActive,
+                    ]}
+                  >
+                    {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.optionsRowDivider} />
+
           {/* Clear Cache */}
           <SquishButton onPress={handleClearCache}>
             <View style={styles.optionRow}>
               <View style={styles.optionInfo}>
                 <View style={[styles.optionIconBg, styles.peachTint]}>
-                  <MaterialIcons name="delete-outline" size={20} color={C.secondaryFixedDim} />
+                  <MaterialIcons name="delete-outline" size={20} color={C.secondary} />
                 </View>
                 <Text style={styles.optionLabel}>Clear Message Cache</Text>
               </View>
@@ -418,7 +437,8 @@ export default function ProfileScreen() {
 }
 
 /* ── StyleSheet ─────────────────────────────────────────────── */
-const styles = StyleSheet.create({
+function getStyles(C: ThemeColors, isDark: boolean) {
+  return StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: C.background,
@@ -718,4 +738,31 @@ const styles = StyleSheet.create({
     opacity: 0.35,
     textAlign: 'center',
   },
+  themeSelector: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    borderRadius: 12,
+    padding: 2,
+    gap: 2,
+  },
+  themeOption: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  themeOptionActive: {
+    backgroundColor: C.primary,
+  },
+  themeOptionText: {
+    fontSize: 12,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    color: C.onSurfaceVariant,
+  },
+  themeOptionTextActive: {
+    color: isDark ? '#002105' : '#ffffff',
+    fontWeight: '700',
+  },
 });
+}

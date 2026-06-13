@@ -17,17 +17,8 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-/* ── Design tokens ─────────────────────────────────────────── */
-const C = {
-  background:         '#0f150e',
-  surface:            '#0f150e',
-  surfaceContainer:   '#1b211a',
-  primaryContainer:   '#96f996',
-  onPrimaryContainer: '#037524',
-  onSurfaceVariant:   '#becab9',
-  outlineVariant:     '#3f4a3d',
-};
+import { useTheme, useStyles } from '@/hooks/useTheme';
+import { ThemeColors } from '@/types/theme';
 
 /* ── Tab definitions ───────────────────────────────────────── */
 const TABS: {
@@ -45,6 +36,8 @@ const TABS: {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function CustomTabBar({ state, navigation }: any) {
   const insets = useSafeAreaInsets();
+  const { colors: C } = useTheme();
+  const styles = useStyles(getStyles);
 
   return (
     <View style={[styles.tabBar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
@@ -66,7 +59,7 @@ function CustomTabBar({ state, navigation }: any) {
           return (
             <TouchableOpacity key={tab.name} onPress={onPress} activeOpacity={0.85} style={styles.activeWrapper}>
               <View style={styles.activePill}>
-                <MaterialIcons name={tab.icon} size={20} color="#037524" />
+                <MaterialIcons name={tab.icon} size={20} color={C.onPrimaryContainer} />
                 <Text style={styles.activeLabel} numberOfLines={1}>{tab.label}</Text>
               </View>
             </TouchableOpacity>
@@ -75,7 +68,7 @@ function CustomTabBar({ state, navigation }: any) {
 
         return (
           <TouchableOpacity key={tab.name} onPress={onPress} activeOpacity={0.7} style={styles.inactiveWrapper}>
-            <MaterialIcons name={tab.icon} size={22} color="#becab9" />
+            <MaterialIcons name={tab.icon} size={22} color={C.onSurfaceVariant} />
             <Text style={styles.inactiveLabel}>{tab.label}</Text>
           </TouchableOpacity>
         );
@@ -86,11 +79,12 @@ function CustomTabBar({ state, navigation }: any) {
 
 export default function TabLayout() {
   const { isInitialized } = useAuth();
+  const { colors: C } = useTheme();
 
   if (!isInitialized) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0f150e' }}>
-        <ActivityIndicator size="large" color="#96f996" />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: C.background }}>
+        <ActivityIndicator size="large" color={C.primary} />
       </View>
     );
   }
@@ -110,19 +104,20 @@ export default function TabLayout() {
   );
 }
 
-const styles = StyleSheet.create({
+function getStyles(C: ThemeColors, isDark: boolean) {
+  return StyleSheet.create({
   /* ── Custom tab bar ────────────────────────────────────────── */
   tabBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
-    backgroundColor: 'rgba(15,21,14,0.94)',
+    backgroundColor: isDark ? 'rgba(15,21,14,0.94)' : 'rgba(244,250,243,0.94)',
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.05)',
+    borderTopColor: C.outlineVariant,
     paddingTop: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -8 },
-    shadowOpacity: 0.3,
+    shadowOpacity: isDark ? 0.3 : 0.08,
     shadowRadius: 16,
     elevation: 20,
   },
@@ -135,21 +130,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#96f996',
+    backgroundColor: C.primaryContainer,
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 9999,
     gap: 5,
     maxWidth: '95%',          // never wider than its slot
     overflow: 'hidden',
-    shadowColor: '#96f996',
+    shadowColor: C.primaryContainer,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.35,
     shadowRadius: 12,
     elevation: 6,
   },
   activeLabel: {
-    color: '#037524',
+    color: C.onPrimaryContainer,
     fontSize: 12,
     fontWeight: '700',
     letterSpacing: 0.2,
@@ -163,9 +158,10 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   inactiveLabel: {
-    color: '#becab9',
+    color: C.onSurfaceVariant,
     fontSize: 10,
     fontWeight: '600',
     letterSpacing: 0.3,
   },
 });
+}

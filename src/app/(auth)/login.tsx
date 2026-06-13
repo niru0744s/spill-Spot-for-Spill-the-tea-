@@ -38,34 +38,15 @@ import {
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAuth } from '@/hooks/useAuth';
+import { useTheme, useStyles } from '@/hooks/useTheme';
+import { ThemeColors } from '@/types/theme';
 
 const { width, height } = Dimensions.get('window');
 
-/* ── Design tokens ──────────────────────────────────────────── */
-const C = {
-  background:         '#0f150e',
-  surfaceVariant:     '#31362f',
-  cardBg:             'rgba(49,54,47,0.45)',
-  cardBorder:         'rgba(137,148,133,0.22)',
-  primaryContainer:   '#96f996',
-  onPrimaryContainer: '#037524',
-  primaryFixed:       '#96f996',
-  primaryFixedDim:    '#7adc7d',
-  secondary:          '#ffb59c',   // peach — Forgot Password
-  onSurface:          '#dfe4d9',
-  onSurfaceVariant:   '#becab9',
-  outlineVariant:     '#3f4a3d',
-  inputBg:            'rgba(49,54,47,0.3)',
-  inputBorder:        'rgba(137,148,133,0.22)',
-  inputFocusBorder:   '#96f996',
-  white:              '#ffffff',
-  errorText:          '#ef4444',
-  errorBg:            'rgba(239,68,68,0.10)',
-  errorBorder:        'rgba(239,68,68,0.25)',
-};
-
 /* ── Animated vortex background ─────────────────────────────── */
 function VortexBackground() {
+  const { colors: C, isDark } = useTheme();
+  const styles = useStyles(getStyles);
   const spin1 = useRef(new Animated.Value(0)).current;
   const spin2 = useRef(new Animated.Value(1)).current; // starts at 1 = 360deg reversed
 
@@ -134,6 +115,8 @@ function PillInput({
   autoCapitalize?: 'none' | 'words';
   rightSlot?: React.ReactNode;
 }) {
+  const { colors: C, isDark } = useTheme();
+  const styles = useStyles(getStyles);
   const [focused, setFocused] = useState(false);
 
   return (
@@ -164,6 +147,8 @@ function PillInput({
 
 /* ── Main Login Screen ──────────────────────────────────────── */
 export default function LoginScreen() {
+  const { colors: C, isDark } = useTheme();
+  const styles = useStyles(getStyles);
   const router = useRouter();
   const { signIn, error: authError } = useAuth();
 
@@ -209,6 +194,7 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} translucent backgroundColor="transparent" />
 
       {/* ── Vortex spinning background ──────────────────────── */}
       <VortexBackground />
@@ -340,255 +326,257 @@ export default function LoginScreen() {
 }
 
 /* ── StyleSheet ─────────────────────────────────────────────── */
-const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: C.background,
-  },
-  kav: {
-    flex: 1,
-  },
-  scroll: {
-    flexGrow: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 32,
-    paddingHorizontal: 20,
-  },
+function getStyles(C: ThemeColors, isDark: boolean) {
+  return StyleSheet.create({
+    safe: {
+      flex: 1,
+      backgroundColor: C.background,
+    },
+    kav: {
+      flex: 1,
+    },
+    scroll: {
+      flexGrow: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 32,
+      paddingHorizontal: 20,
+    },
 
-  /* ── Vortex layers ──────────────────────────────────────── */
-  vortexLayer1: {
-    position: 'absolute',
-    // Oversized to cover full screen when rotating
-    top: -height * 0.5,
-    left: -width * 0.5,
-    width: width * 2,
-    height: height * 2,
-    borderRadius: width,
-    // Matcha green radial center glow
-    backgroundColor: 'transparent',
-    // Simulate radial via large shadow
-    shadowColor: '#96f996',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.15,
-    shadowRadius: width * 0.6,
-    // Inner accent via border
-    borderWidth: 1,
-    borderColor: 'rgba(150,249,150,0.06)',
-  },
-  vortexLayer2: {
-    position: 'absolute',
-    top: -height * 0.3,
-    left: -width * 0.3,
-    width: width * 1.6,
-    height: height * 1.6,
-    borderRadius: width,
-    backgroundColor: 'transparent',
-    shadowColor: '#ffb59c',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.08,
-    shadowRadius: width * 0.5,
-    borderWidth: 1,
-    borderColor: 'rgba(255,181,156,0.04)',
-  },
+    /* ── Vortex layers ──────────────────────────────────────── */
+    vortexLayer1: {
+      position: 'absolute',
+      // Oversized to cover full screen when rotating
+      top: -height * 0.5,
+      left: -width * 0.5,
+      width: width * 2,
+      height: height * 2,
+      borderRadius: width,
+      // Matcha green radial center glow
+      backgroundColor: 'transparent',
+      // Simulate radial via large shadow
+      shadowColor: C.primaryContainer,
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.15,
+      shadowRadius: width * 0.6,
+      // Inner accent via border
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(150,249,150,0.06)' : 'rgba(46,168,71,0.06)',
+    },
+    vortexLayer2: {
+      position: 'absolute',
+      top: -height * 0.3,
+      left: -width * 0.3,
+      width: width * 1.6,
+      height: height * 1.6,
+      borderRadius: width,
+      backgroundColor: 'transparent',
+      shadowColor: C.secondary,
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.08,
+      shadowRadius: width * 0.5,
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(255,181,156,0.04)' : 'rgba(224,101,61,0.04)',
+    },
 
-  /* ── Glass card ─────────────────────────────────────────── */
-  card: {
-    width: '100%',
-    maxWidth: 400,
-    backgroundColor: C.cardBg,
-    borderRadius: 32,
-    borderWidth: 1,
-    borderColor: C.cardBorder,
-    paddingHorizontal: 28,
-    paddingVertical: 36,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 20 },
-    shadowOpacity: 0.5,
-    shadowRadius: 40,
-    elevation: 20,
-    gap: 32,
-  },
+    /* ── Glass card ─────────────────────────────────────────── */
+    card: {
+      width: '100%',
+      maxWidth: 400,
+      backgroundColor: C.cardBg,
+      borderRadius: 32,
+      borderWidth: 1,
+      borderColor: C.cardBorder,
+      paddingHorizontal: 28,
+      paddingVertical: 36,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 20 },
+      shadowOpacity: isDark ? 0.5 : 0.12,
+      shadowRadius: 40,
+      elevation: 20,
+      gap: 32,
+    },
 
-  /* ── Header ─────────────────────────────────────────────── */
-  header: {
-    alignItems: 'center',
-    gap: 10,
-  },
+    /* ── Header ─────────────────────────────────────────────── */
+    header: {
+      alignItems: 'center',
+      gap: 10,
+    },
 
-  /* Tea pill */
-  teaPill: {
-    backgroundColor: C.primaryContainer,
-    paddingHorizontal: 24,
-    paddingVertical: 8,
-    borderRadius: 9999,
-    borderWidth: 1,
-    borderColor: 'rgba(150,249,150,0.5)',
-    shadowColor: '#96f996',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.35,
-    shadowRadius: 16,
-    elevation: 8,
-    marginBottom: 4,
-  },
-  teaPillText: {
-    color: C.onPrimaryContainer,
-    fontSize: 20,
-    fontWeight: '700',
-    letterSpacing: -0.3,
-  },
+    /* Tea pill */
+    teaPill: {
+      backgroundColor: C.primaryContainer,
+      paddingHorizontal: 24,
+      paddingVertical: 8,
+      borderRadius: 9999,
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(150,249,150,0.5)' : 'rgba(46,168,71,0.5)',
+      shadowColor: C.primaryContainer,
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.35,
+      shadowRadius: 16,
+      elevation: 8,
+      marginBottom: 4,
+    },
+    teaPillText: {
+      color: C.onPrimaryContainer,
+      fontSize: 20,
+      fontWeight: '700',
+      letterSpacing: -0.3,
+    },
 
-  headline: {
-    fontSize: 36,
-    fontWeight: '800',
-    color: C.white,
-    letterSpacing: -1,
-    textAlign: 'center',
-  },
-  subheadline: {
-    fontSize: 18,
-    fontWeight: '400',
-    color: C.onSurfaceVariant,
-    textAlign: 'center',
-  },
+    headline: {
+      fontSize: 36,
+      fontWeight: '800',
+      color: C.white,
+      letterSpacing: -1,
+      textAlign: 'center',
+    },
+    subheadline: {
+      fontSize: 18,
+      fontWeight: '400',
+      color: C.onSurfaceVariant,
+      textAlign: 'center',
+    },
 
-  /* ── Form section ───────────────────────────────────────── */
-  formSection: {
-    gap: 16,
-  },
+    /* ── Form section ───────────────────────────────────────── */
+    formSection: {
+      gap: 16,
+    },
 
-  /* Error */
-  errorBox: {
-    backgroundColor: C.errorBg,
-    borderWidth: 1,
-    borderColor: C.errorBorder,
-    borderRadius: 14,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-  },
-  errorText: {
-    color: C.errorText,
-    fontSize: 14,
-    fontWeight: '500',
-    textAlign: 'center',
-  },
+    /* Error */
+    errorBox: {
+      backgroundColor: C.errorBg,
+      borderWidth: 1,
+      borderColor: C.errorBorder,
+      borderRadius: 14,
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+    },
+    errorText: {
+      color: C.errorText,
+      fontSize: 14,
+      fontWeight: '500',
+      textAlign: 'center',
+    },
 
-  /* Inputs */
-  inputsGroup: {
-    gap: 12,
-  },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: C.inputBg,
-    borderRadius: 9999,
-    borderWidth: 1,
-    borderColor: C.inputBorder,
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-  },
-  inputRowFocused: {
-    borderColor: C.inputFocusBorder,
-    backgroundColor: 'rgba(49,54,47,0.5)',
-  },
-  inputIcon: {
-    marginRight: 12,
-  },
-  input: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '400',
-    color: C.onSurface,
-    padding: 0,
-  },
+    /* Inputs */
+    inputsGroup: {
+      gap: 12,
+    },
+    inputRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: C.inputBg,
+      borderRadius: 9999,
+      borderWidth: 1,
+      borderColor: C.inputBorder,
+      paddingHorizontal: 18,
+      paddingVertical: 14,
+    },
+    inputRowFocused: {
+      borderColor: C.inputFocusBorder,
+      backgroundColor: isDark ? 'rgba(49,54,47,0.5)' : 'rgba(234,242,232,0.65)',
+    },
+    inputIcon: {
+      marginRight: 12,
+    },
+    input: {
+      flex: 1,
+      fontSize: 16,
+      fontWeight: '400',
+      color: C.onSurface,
+      padding: 0,
+    },
 
-  /* Forgot password */
-  forgotRow: {
-    alignSelf: 'flex-end',
-    marginTop: -4,
-  },
-  forgotText: {
-    color: C.secondary,
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-  },
+    /* Forgot password */
+    forgotRow: {
+      alignSelf: 'flex-end',
+      marginTop: -4,
+    },
+    forgotText: {
+      color: C.secondary,
+      fontSize: 12,
+      fontWeight: '700',
+      letterSpacing: 0.8,
+      textTransform: 'uppercase',
+    },
 
-  /* CTA */
-  ctaBtn: {
-    width: '100%',
-    backgroundColor: C.primaryContainer,
-    paddingVertical: 17,
-    borderRadius: 9999,
-    alignItems: 'center',
-    shadowColor: '#96f996',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.35,
-    shadowRadius: 22,
-    elevation: 10,
-  },
-  ctaBtnDisabled: {
-    opacity: 0.7,
-  },
-  ctaBtnText: {
-    color: C.onPrimaryContainer,
-    fontSize: 18,
-    fontWeight: '700',
-    letterSpacing: 0.2,
-  },
+    /* CTA */
+    ctaBtn: {
+      width: '100%',
+      backgroundColor: C.primaryContainer,
+      paddingVertical: 17,
+      borderRadius: 9999,
+      alignItems: 'center',
+      shadowColor: C.primaryContainer,
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.35,
+      shadowRadius: 22,
+      elevation: 10,
+    },
+    ctaBtnDisabled: {
+      opacity: 0.7,
+    },
+    ctaBtnText: {
+      color: C.onPrimaryContainer,
+      fontSize: 18,
+      fontWeight: '700',
+      letterSpacing: 0.2,
+    },
 
-  /* OR divider */
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    opacity: 0.6,
-    marginVertical: 4,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: C.outlineVariant,
-  },
-  dividerText: {
-    color: C.onSurfaceVariant,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1.5,
-  },
+    /* OR divider */
+    divider: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      opacity: 0.6,
+      marginVertical: 4,
+    },
+    dividerLine: {
+      flex: 1,
+      height: 1,
+      backgroundColor: C.outlineVariant,
+    },
+    dividerText: {
+      color: C.onSurfaceVariant,
+      fontSize: 11,
+      fontWeight: '700',
+      letterSpacing: 1.5,
+    },
 
-  /* Social buttons */
-  socialRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  socialBtn: {
-    flex: 1,
-    backgroundColor: C.inputBg,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: C.inputBorder,
-    paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+    /* Social buttons */
+    socialRow: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    socialBtn: {
+      flex: 1,
+      backgroundColor: C.inputBg,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: C.inputBorder,
+      paddingVertical: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
 
-  /* Footer */
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: -8,
-  },
-  footerText: {
-    color: C.onSurfaceVariant,
-    fontSize: 15,
-    fontWeight: '400',
-  },
-  footerLink: {
-    color: C.primaryFixedDim,
-    fontSize: 15,
-    fontWeight: '700',
-  },
-});
+    /* Footer */
+    footer: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginTop: -8,
+    },
+    footerText: {
+      color: C.onSurfaceVariant,
+      fontSize: 15,
+      fontWeight: '400',
+    },
+    footerLink: {
+      color: C.primaryFixedDim,
+      fontSize: 15,
+      fontWeight: '700',
+    },
+  });
+}
