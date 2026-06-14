@@ -7,9 +7,10 @@ export function useTheme() {
   return useContext(ThemeContext);
 }
 
-export function useStyles<T extends StyleSheet.NamedStyles<T> | StyleSheet.NamedStyles<any>>(
-  getStyles: (C: ThemeColors, isDark: boolean) => T
+export function useStyles<T extends StyleSheet.NamedStyles<T> | StyleSheet.NamedStyles<any>, A extends any[]>(
+  getStyles: (C: ThemeColors, isDark: boolean, ...args: A) => T,
+  ...args: A
 ): T {
   const { colors, isDark } = useTheme();
-  return useMemo(() => getStyles(colors, isDark), [colors, isDark, getStyles]);
+  return useMemo(() => getStyles(colors, isDark, ...args), [colors, isDark, getStyles, ...args]); // eslint-disable-line react-hooks/exhaustive-deps
 }

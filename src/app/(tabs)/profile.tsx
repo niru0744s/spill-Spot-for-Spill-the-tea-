@@ -98,11 +98,6 @@ function SquishButton({
 
 /* ── Profile Screen ─────────────────────────────────────────── */
 export default function ProfileScreen() {
-  const { colors: C, themeMode, setThemeMode, isDark } = useTheme();
-  const styles = useStyles(getStyles);
-  const insets = useSafeAreaInsets();
-  const { signOut, user, updateProfile, updateProfilePhoto, isLoading: authLoading } = useAuth();
-
   // Load signature typography via bundled @expo-google-fonts packages (TTF, works on native)
   const [fontsLoaded, fontError] = useFonts({
     Sora_700Bold,
@@ -110,6 +105,11 @@ export default function ProfileScreen() {
     PlusJakartaSans_500Medium,
     SpaceGrotesk_700Bold,
   });
+
+  const { colors: C, themeMode, setThemeMode, isDark } = useTheme();
+  const styles = useStyles(getStyles, fontsLoaded);
+  const insets = useSafeAreaInsets();
+  const { signOut, user, updateProfile, updateProfilePhoto, isLoading: authLoading } = useAuth();
 
   React.useEffect(() => {
     if (fontError) {
@@ -424,7 +424,7 @@ export default function ProfileScreen() {
 }
 
 /* ── StyleSheet ─────────────────────────────────────────────── */
-function getStyles(C: ThemeColors, isDark: boolean) {
+function getStyles(C: ThemeColors, isDark: boolean, fontsLoaded: boolean) {
   return StyleSheet.create({
     container: {
       flex: 1,
@@ -442,10 +442,13 @@ function getStyles(C: ThemeColors, isDark: boolean) {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
+      maxWidth: 500,
+      width: '100%',
+      alignSelf: 'center',
     },
     headerBrand: {
       fontSize: 24,
-      fontFamily: 'Sora_800ExtraBold',
+      fontFamily: fontsLoaded ? 'Sora_800ExtraBold' : undefined,
       color: C.onSurface,
       letterSpacing: -0.5,
     },
@@ -468,6 +471,8 @@ function getStyles(C: ThemeColors, isDark: boolean) {
     /* Profile Card */
     profileCard: {
       width: '100%',
+      maxWidth: 500,
+      alignSelf: 'center',
       backgroundColor: C.cardBg, // Glassmorphic surface dim
       borderRadius: 32,
       borderWidth: 1,
@@ -510,7 +515,7 @@ function getStyles(C: ThemeColors, isDark: boolean) {
     },
     avatarInitial: {
       fontSize: 48,
-      fontFamily: 'Sora_700Bold',
+      fontFamily: fontsLoaded ? 'Sora_700Bold' : undefined,
       color: C.primaryFixed,
     },
     avatarEditOverlay: {
@@ -534,6 +539,7 @@ function getStyles(C: ThemeColors, isDark: boolean) {
     detailsGroup: {
       alignItems: 'center',
       gap: 6,
+      width: '100%',
     },
     nameDisplayRow: {
       flexDirection: 'row',
@@ -545,7 +551,7 @@ function getStyles(C: ThemeColors, isDark: boolean) {
     },
     displayName: {
       fontSize: 24,
-      fontFamily: 'Sora_700Bold',
+      fontFamily: fontsLoaded ? 'Sora_700Bold' : undefined,
       color: C.onSurface,
       letterSpacing: -0.5,
       flexShrink: 1,
@@ -555,7 +561,7 @@ function getStyles(C: ThemeColors, isDark: boolean) {
     },
     emailText: {
       fontSize: 14,
-      fontFamily: 'PlusJakartaSans_500Medium',
+      fontFamily: fontsLoaded ? 'PlusJakartaSans_500Medium' : undefined,
       color: C.onSurfaceVariant,
       opacity: 0.8,
     },
@@ -571,7 +577,7 @@ function getStyles(C: ThemeColors, isDark: boolean) {
       paddingLeft: 18,
       paddingRight: 8,
       height: 48,
-      width: width - 80,
+      width: width > 540 ? 420 : width - 80,
       gap: 8,
       shadowColor: C.primaryFixed,
       shadowOffset: { width: 0, height: 0 },
@@ -581,7 +587,7 @@ function getStyles(C: ThemeColors, isDark: boolean) {
     inlineNameInput: {
       flex: 1,
       fontSize: 16,
-      fontFamily: 'PlusJakartaSans_500Medium',
+      fontFamily: fontsLoaded ? 'PlusJakartaSans_500Medium' : undefined,
       color: C.onSurface,
       padding: 0,
     },
@@ -596,18 +602,23 @@ function getStyles(C: ThemeColors, isDark: boolean) {
     /* Section Labels */
     sectionLabel: {
       fontSize: 12,
-      fontFamily: 'SpaceGrotesk_700Bold',
+      fontFamily: fontsLoaded ? 'SpaceGrotesk_700Bold' : undefined,
       color: C.onSurfaceVariant,
       letterSpacing: 2,
       textTransform: 'uppercase',
       marginTop: 28,
       marginBottom: 10,
       marginLeft: 6,
+      maxWidth: 500,
+      width: '100%',
+      alignSelf: 'center',
     },
 
     /* Statistics */
     statsCard: {
       width: '100%',
+      maxWidth: 500,
+      alignSelf: 'center',
       backgroundColor: C.cardBg,
       borderRadius: 24,
       borderWidth: 1,
@@ -625,20 +636,20 @@ function getStyles(C: ThemeColors, isDark: boolean) {
     },
     statNum: {
       fontSize: 22,
-      fontFamily: 'Sora_700Bold',
+      fontFamily: fontsLoaded ? 'Sora_700Bold' : undefined,
       color: C.primaryFixed,
       letterSpacing: -0.5,
     },
     statNumDate: {
       fontSize: 16,
-      fontFamily: 'Sora_700Bold',
+      fontFamily: fontsLoaded ? 'Sora_700Bold' : undefined,
       color: C.primaryFixed,
       letterSpacing: -0.2,
       paddingVertical: 3,
     },
     statLabel: {
       fontSize: 9,
-      fontFamily: 'SpaceGrotesk_700Bold',
+      fontFamily: fontsLoaded ? 'SpaceGrotesk_700Bold' : undefined,
       color: C.onSurfaceVariant,
       letterSpacing: 1,
     },
@@ -651,6 +662,8 @@ function getStyles(C: ThemeColors, isDark: boolean) {
     /* Settings Options */
     optionsList: {
       width: '100%',
+      maxWidth: 500,
+      alignSelf: 'center',
       backgroundColor: C.cardBg,
       borderRadius: 24,
       borderWidth: 1,
@@ -685,12 +698,12 @@ function getStyles(C: ThemeColors, isDark: boolean) {
     },
     optionLabel: {
       fontSize: 15,
-      fontFamily: 'PlusJakartaSans_500Medium',
+      fontFamily: fontsLoaded ? 'PlusJakartaSans_500Medium' : undefined,
       color: C.onSurface,
     },
     versionText: {
       fontSize: 13,
-      fontFamily: 'PlusJakartaSans_500Medium',
+      fontFamily: fontsLoaded ? 'PlusJakartaSans_500Medium' : undefined,
       color: C.onSurfaceVariant,
       opacity: 0.7,
     },
@@ -703,6 +716,9 @@ function getStyles(C: ThemeColors, isDark: boolean) {
     /* Log Out Container */
     logoutContainer: {
       marginTop: 36,
+      width: '100%',
+      maxWidth: 500,
+      alignSelf: 'center',
     },
     logoutBtn: {
       width: '100%',
@@ -721,7 +737,7 @@ function getStyles(C: ThemeColors, isDark: boolean) {
     },
     logoutText: {
       color: C.errorText,
-      fontFamily: 'Sora_700Bold',
+      fontFamily: fontsLoaded ? 'Sora_700Bold' : undefined,
       fontSize: 16,
       letterSpacing: 0.2,
     },
@@ -731,10 +747,13 @@ function getStyles(C: ThemeColors, isDark: boolean) {
       marginTop: 28,
       color: C.onSurfaceVariant,
       fontSize: 9,
-      fontFamily: 'SpaceGrotesk_700Bold',
+      fontFamily: fontsLoaded ? 'SpaceGrotesk_700Bold' : undefined,
       letterSpacing: 3,
       opacity: 0.35,
       textAlign: 'center',
+      maxWidth: 500,
+      width: '100%',
+      alignSelf: 'center',
     },
   });
 }
