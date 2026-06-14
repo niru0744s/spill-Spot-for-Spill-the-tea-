@@ -831,13 +831,13 @@ function getStyles(C: ThemeColors, isDark: boolean) {
     letterSpacing: 0.8,
   },
   cardImage: {
-    width: '100%',
+    alignSelf: 'stretch',
     height: 170,
     borderRadius: 12,
     backgroundColor: C.surfaceHigh,
   },
   cardImageFallback: {
-    width: '100%',
+    alignSelf: 'stretch',
     height: 130,
     borderRadius: 12,
     backgroundColor: C.surfaceHigh,
