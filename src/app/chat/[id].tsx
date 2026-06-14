@@ -271,7 +271,7 @@ const MessageBubble = memo(function MessageBubble({
   setVideoPlayerUri: (uri: string | null) => void;
   setVideoModalVisible: (visible: boolean) => void;
 }) {
-  const { colors: C } = useTheme();
+  const { colors: C, isDark } = useTheme();
   const styles = useStyles(getStyles);
   const isGrouped = prevItem &&
     prevItem.isMine === item.isMine &&
@@ -411,7 +411,7 @@ const MessageBubble = memo(function MessageBubble({
         style={[
           styles.bubble,
           item.type === 'DELETED'
-            ? { backgroundColor: 'rgba(255, 255, 255, 0.04)', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.05)', paddingHorizontal: 12, paddingVertical: 8 }
+            ? { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.03)', borderWidth: 1, borderColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.08)', paddingHorizontal: 12, paddingVertical: 8 }
             : isMedia
               ? { padding: 4 }
               : (item.isMine ? styles.bubbleOut : styles.bubbleIn),
@@ -1828,7 +1828,7 @@ function getStyles(C: ThemeColors, isDark: boolean) {
   attachmentModalTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: C.white,
+    color: C.onSurface,
   },
   attachmentOptionsGrid: {
     flexDirection: 'row',
@@ -1887,7 +1887,7 @@ function getStyles(C: ThemeColors, isDark: boolean) {
   recordingTimerText: {
     fontSize: 15,
     fontWeight: '600',
-    color: C.white,
+    color: C.onSurface,
   },
   recordingActions: {
     flexDirection: 'row',

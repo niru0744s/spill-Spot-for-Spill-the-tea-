@@ -88,6 +88,8 @@ export function useGlobalMessages() {
           status:        data.status       ?? 'ACTIVE',
         });
 
+        const isGroup = data.isGroup ?? getChatMeta(chatId)?.isGroup ?? false;
+
         // 2️⃣ Attach a messages listener for this chat (if not already attached)
         if (!chatUnsubsRef.current.has(chatId)) {
           // Prune the oldest listener if we've hit the cap
@@ -98,7 +100,7 @@ export function useGlobalMessages() {
               chatUnsubsRef.current.delete(oldest);
             }
           }
-          attachChatListener(chatId, currentUid, chatUnsubsRef.current, chatOrderRef.current);
+          attachChatListener(chatId, currentUid, chatUnsubsRef.current, chatOrderRef.current, isGroup);
         }
       }
     });
@@ -122,7 +124,8 @@ function attachChatListener(
   chatId: string,
   currentUid: string,
   registry: Map<string, Unsubscribe>,
-  order: string[]
+  order: string[],
+  isGroup: boolean
 ): void {
   const msgsRef  = collection(db, 'chats', chatId, 'messages');
   const msgsQuery = query(msgsRef, orderBy('createdAt', 'asc'));
@@ -148,7 +151,9 @@ function attachChatListener(
           }
           markMessageAsDeletedLocally(chatId, data.targetMessageId);
         }
-        deleteDoc(doc(db, 'chats', chatId, 'messages', msgId)).catch(() => {});
+        if (!isGroup) {
+          deleteDoc(doc(db, 'chats', chatId, 'messages', msgId)).catch(() => {});
+        }
         return;
       }
 
@@ -159,7 +164,9 @@ function attachChatListener(
         if (target) {
           editMessageLocally(chatId, data.targetMessageId, data.content);
         }
-        deleteDoc(doc(db, 'chats', chatId, 'messages', msgId)).catch(() => {});
+        if (!isGroup) {
+          deleteDoc(doc(db, 'chats', chatId, 'messages', msgId)).catch(() => {});
+        }
         return;
       }
 
@@ -186,7 +193,9 @@ function attachChatListener(
       const alreadySaved = existing.some(m => m.id === msgId);
       if (alreadySaved) {
         // Clean up document from Firestore if already processed
-        deleteDoc(doc(db, 'chats', chatId, 'messages', msgId)).catch(() => {});
+        if (!isGroup) {
+          deleteDoc(doc(db, 'chats', chatId, 'messages', msgId)).catch(() => {});
+        }
         return;
       }
 
@@ -201,7 +210,9 @@ function attachChatListener(
       }
 
       // Immediately delete transit message document from Firestore
-      deleteDoc(doc(db, 'chats', chatId, 'messages', msgId)).catch(() => {});
+      if (!isGroup) {
+        deleteDoc(doc(db, 'chats', chatId, 'messages', msgId)).catch(() => {});
+      }
 
       // Increment unread and trigger In-App Banner only if user is NOT currently in this chat
       if (getActiveChatId() !== chatId) {

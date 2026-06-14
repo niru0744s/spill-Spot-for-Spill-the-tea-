@@ -391,7 +391,7 @@ export default function GroupSettingsScreen() {
             }
           }}
         >
-          <MaterialIcons name="arrow-back-ios" size={20} color={C.white} />
+          <MaterialIcons name="arrow-back-ios" size={20} color={C.onSurface} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Group Info</Text>
         <View style={{ width: 40 }} />
@@ -575,7 +575,7 @@ export default function GroupSettingsScreen() {
                   setIsAddMemberVisible(false);
                 }}
               >
-                <MaterialIcons name="close" size={24} color={C.white} />
+                <MaterialIcons name="close" size={24} color={C.onSurface} />
               </TouchableOpacity>
             </View>
 
@@ -665,7 +665,7 @@ function getStyles(C: ThemeColors, isDark: boolean) {
       paddingHorizontal: 16,
       paddingVertical: 14,
       borderBottomWidth: 1,
-      borderColor: 'rgba(255,255,255,0.03)',
+      borderColor: C.cardBorder,
     },
     backBtn: {
       width: 40,
@@ -679,7 +679,7 @@ function getStyles(C: ThemeColors, isDark: boolean) {
     headerTitle: {
       fontSize: 20,
       fontWeight: '800',
-      color: C.white,
+      color: C.onSurface,
       letterSpacing: -0.5,
     },
     scrollContent: {
@@ -736,7 +736,7 @@ function getStyles(C: ThemeColors, isDark: boolean) {
       padding: 16,
       marginTop: 24,
       borderWidth: 1,
-      borderColor: 'rgba(255,255,255,0.03)',
+      borderColor: C.cardBorder,
     },
     infoTitleRow: {
       flexDirection: 'row',
@@ -747,7 +747,7 @@ function getStyles(C: ThemeColors, isDark: boolean) {
     groupNameText: {
       fontSize: 20,
       fontWeight: '800',
-      color: C.white,
+      color: C.onSurface,
       flex: 1,
       paddingRight: 12,
     },
@@ -767,8 +767,8 @@ function getStyles(C: ThemeColors, isDark: boolean) {
       backgroundColor: C.surfaceContainerHigh,
       borderRadius: 12,
       borderWidth: 1,
-      borderColor: 'rgba(255,255,255,0.05)',
-      color: C.white,
+      borderColor: C.inputBorder,
+      color: C.onSurface,
       paddingHorizontal: 14,
       paddingVertical: 10,
       fontSize: 15,
@@ -796,7 +796,7 @@ function getStyles(C: ThemeColors, isDark: boolean) {
       color: isDark ? '#380c00' : '#ffffff',
     },
     cancelBtn: {
-      backgroundColor: 'rgba(255,255,255,0.06)',
+      backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : C.surfaceContainerHigh,
       paddingHorizontal: 16,
       paddingVertical: 8,
       borderRadius: 10,
@@ -804,7 +804,7 @@ function getStyles(C: ThemeColors, isDark: boolean) {
     cancelBtnText: {
       fontSize: 13,
       fontWeight: '800',
-      color: C.white,
+      color: C.onSurface,
     },
     rosterHeader: {
       flexDirection: 'row',
@@ -867,7 +867,7 @@ function getStyles(C: ThemeColors, isDark: boolean) {
     memberName: {
       fontSize: 14,
       fontWeight: '700',
-      color: C.white,
+      color: C.onSurface,
     },
     memberUsername: {
       fontSize: 12,
@@ -940,7 +940,7 @@ function getStyles(C: ThemeColors, isDark: boolean) {
     modalTitle: {
       fontSize: 18,
       fontWeight: '800',
-      color: C.white,
+      color: C.onSurface,
     },
     modalCloseBtn: {
       width: 36,
@@ -963,7 +963,7 @@ function getStyles(C: ThemeColors, isDark: boolean) {
     },
     modalSearchInput: {
       flex: 1,
-      color: C.white,
+      color: C.onSurface,
       fontSize: 14,
       fontWeight: '600',
     },
@@ -996,7 +996,7 @@ function getStyles(C: ThemeColors, isDark: boolean) {
     modalUserName: {
       fontSize: 14,
       fontWeight: '700',
-      color: C.white,
+      color: C.onSurface,
     },
     modalUserSub: {
       fontSize: 12,

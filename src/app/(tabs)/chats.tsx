@@ -480,7 +480,7 @@ const getStyles = (C: ThemeColors, isDark: boolean) => StyleSheet.create({
   pageTitle: {
     fontSize: 36,
     fontWeight: '800',
-    color: C.white,
+    color: C.onSurface,
     letterSpacing: -1,
     lineHeight: 40,
   },
@@ -727,7 +727,7 @@ const getStyles = (C: ThemeColors, isDark: boolean) => StyleSheet.create({
   emptyTitle: {
     fontSize: 22,
     fontWeight: '800',
-    color: C.white,
+    color: C.onSurface,
     textAlign: 'center',
   },
   emptySubtitle: {

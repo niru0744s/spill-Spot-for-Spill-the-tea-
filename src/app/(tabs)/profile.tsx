@@ -227,6 +227,22 @@ export default function ProfileScreen() {
   };
 
 
+  const getThemeIcon = () => {
+    if (themeMode === 'light') return 'wb-sunny';
+    if (themeMode === 'dark') return 'nights-stay';
+    return 'settings';
+  };
+
+  const toggleTheme = () => {
+    if (themeMode === 'system') {
+      setThemeMode('light');
+    } else if (themeMode === 'light') {
+      setThemeMode('dark');
+    } else {
+      setThemeMode('system');
+    }
+  };
+
   const isWorking = authLoading || isUploadingPhoto;
 
   return (
@@ -238,8 +254,10 @@ export default function ProfileScreen() {
       >
         {/* ── Header ────────────────────────────────────── */}
         <View style={styles.header}>
-          <Text style={styles.headerBrand}>Tea</Text>
-          <Text style={styles.headerTitle}>My Profile</Text>
+          <Text style={styles.headerBrand}>My Profile</Text>
+          <TouchableOpacity style={styles.themeToggleBtn} onPress={toggleTheme} activeOpacity={0.7}>
+            <MaterialIcons name={getThemeIcon()} size={20} color={C.onSurface} />
+          </TouchableOpacity>
         </View>
 
         {/* ── Glassmorphic Profile Card ───────────────────── */}
@@ -298,7 +316,9 @@ export default function ProfileScreen() {
                 style={styles.nameDisplayRow}
                 onPress={() => setIsEditingName(true)}
               >
-                <Text style={styles.displayName}>{user?.displayName || 'Tea Friend'}</Text>
+                <Text style={styles.displayName} numberOfLines={1} ellipsizeMode="tail">
+                  {user?.displayName || 'Tea Friend'}
+                </Text>
                 <MaterialIcons name="edit" size={16} color={C.onSurfaceVariant} style={styles.editIcon} />
               </SquishButton>
             )}
@@ -350,39 +370,6 @@ export default function ProfileScreen() {
               thumbColor={notifEnabled ? C.primaryFixed : C.onSurfaceVariant}
               trackColor={{ false: C.surfaceContainerHigh, true: 'rgba(150,249,150,0.35)' }}
             />
-          </View>
-
-          <View style={styles.optionsRowDivider} />
-
-          {/* App Theme Selector */}
-          <View style={styles.optionRow}>
-            <View style={styles.optionInfo}>
-              <View style={[styles.optionIconBg, styles.matchaTint]}>
-                <MaterialIcons name="palette" size={20} color={C.primaryFixedDim} />
-              </View>
-              <Text style={styles.optionLabel}>App Theme</Text>
-            </View>
-            <View style={styles.themeSelector}>
-              {(['system', 'light', 'dark'] as const).map((mode) => (
-                <TouchableOpacity
-                  key={mode}
-                  style={[
-                    styles.themeOption,
-                    themeMode === mode && styles.themeOptionActive,
-                  ]}
-                  onPress={() => setThemeMode(mode)}
-                >
-                  <Text
-                    style={[
-                      styles.themeOptionText,
-                      themeMode === mode && styles.themeOptionTextActive,
-                    ]}
-                  >
-                    {mode.charAt(0).toUpperCase() + mode.slice(1)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
           </View>
 
           <View style={styles.optionsRowDivider} />
@@ -439,330 +426,315 @@ export default function ProfileScreen() {
 /* ── StyleSheet ─────────────────────────────────────────────── */
 function getStyles(C: ThemeColors, isDark: boolean) {
   return StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: C.background,
-  },
-  scroll: {
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-  },
+    container: {
+      flex: 1,
+      backgroundColor: C.background,
+    },
+    scroll: {
+      paddingHorizontal: 20,
+      paddingBottom: 40,
+    },
 
-  /* Header */
-  header: {
-    marginTop: 10,
-    marginBottom: 24,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  headerBrand: {
-    fontSize: 26,
-    fontFamily: 'Sora_700Bold',
-    fontStyle: 'italic',
-    color: C.primaryFixed,
-    letterSpacing: -1.5,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontFamily: 'Sora_700Bold',
-    color: C.white,
-    letterSpacing: -0.3,
-  },
+    /* Header */
+    header: {
+      marginTop: 10,
+      marginBottom: 24,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    headerBrand: {
+      fontSize: 24,
+      fontFamily: 'Sora_800ExtraBold',
+      color: C.onSurface,
+      letterSpacing: -0.5,
+    },
+    themeToggleBtn: {
+      width: 42,
+      height: 42,
+      borderRadius: 21,
+      backgroundColor: C.surfaceContainer,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: C.cardBorder,
+      shadowColor: C.primaryFixed,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.08,
+      shadowRadius: 4,
+      elevation: 2,
+    },
 
-  /* Profile Card */
-  profileCard: {
-    width: '100%',
-    backgroundColor: C.cardBg, // Glassmorphic surface dim
-    borderRadius: 32,
-    borderWidth: 1,
-    borderColor: C.cardBorder, // Matcha high-contrast subtle border
-    paddingVertical: 32,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-    gap: 20,
-    shadowColor: C.primaryFixed,
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.1,
-    shadowRadius: 28,
-    elevation: 6,
-  },
-  avatarWrapper: {
-    position: 'relative',
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    borderWidth: 3,
-    borderColor: C.primaryFixed,
-    shadowColor: '#96f996', // Physical light emission Matcha glow!
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.45,
-    shadowRadius: 18,
-    elevation: 8,
-  },
-  avatarImg: {
-    width: 114,
-    height: 114,
-    borderRadius: 57,
-  },
-  avatarFallback: {
-    width: 114,
-    height: 114,
-    borderRadius: 57,
-    backgroundColor: 'rgba(150,249,150,0.12)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarInitial: {
-    fontSize: 48,
-    fontFamily: 'Sora_700Bold',
-    color: C.primaryFixed,
-  },
-  avatarEditOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: C.primaryFixed,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: C.background,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  detailsGroup: {
-    alignItems: 'center',
-    gap: 6,
-  },
-  nameDisplayRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  displayName: {
-    fontSize: 24,
-    fontFamily: 'Sora_700Bold',
-    color: C.white,
-    letterSpacing: -0.5,
-  },
-  editIcon: {
-    opacity: 0.7,
-  },
-  emailText: {
-    fontSize: 14,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: C.onSurfaceVariant,
-    opacity: 0.8,
-  },
+    /* Profile Card */
+    profileCard: {
+      width: '100%',
+      backgroundColor: C.cardBg, // Glassmorphic surface dim
+      borderRadius: 32,
+      borderWidth: 1,
+      borderColor: C.cardBorder, // Matcha high-contrast subtle border
+      paddingVertical: 32,
+      paddingHorizontal: 20,
+      alignItems: 'center',
+      gap: 20,
+      shadowColor: C.primaryFixed,
+      shadowOffset: { width: 0, height: 16 },
+      shadowOpacity: 0.1,
+      shadowRadius: 28,
+      elevation: 6,
+    },
+    avatarWrapper: {
+      position: 'relative',
+      width: 120,
+      height: 120,
+      borderRadius: 60,
+      borderWidth: 3,
+      borderColor: C.primaryFixed,
+      shadowColor: C.primaryFixed, // Physical light emission Matcha glow!
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.45,
+      shadowRadius: 18,
+      elevation: 8,
+    },
+    avatarImg: {
+      width: 114,
+      height: 114,
+      borderRadius: 57,
+    },
+    avatarFallback: {
+      width: 114,
+      height: 114,
+      borderRadius: 57,
+      backgroundColor: 'rgba(150,249,150,0.12)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    avatarInitial: {
+      fontSize: 48,
+      fontFamily: 'Sora_700Bold',
+      color: C.primaryFixed,
+    },
+    avatarEditOverlay: {
+      position: 'absolute',
+      bottom: 0,
+      right: 0,
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: C.primaryFixed,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 3,
+      borderColor: C.background,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 6,
+      elevation: 4,
+    },
+    detailsGroup: {
+      alignItems: 'center',
+      gap: 6,
+    },
+    nameDisplayRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      maxWidth: '90%',
+      alignSelf: 'center',
+    },
+    displayName: {
+      fontSize: 24,
+      fontFamily: 'Sora_700Bold',
+      color: C.onSurface,
+      letterSpacing: -0.5,
+      flexShrink: 1,
+    },
+    editIcon: {
+      opacity: 0.7,
+    },
+    emailText: {
+      fontSize: 14,
+      fontFamily: 'PlusJakartaSans_500Medium',
+      color: C.onSurfaceVariant,
+      opacity: 0.8,
+    },
 
-  /* Inline Editing */
-  inlineEditRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(10,16,9,0.75)', // Deep Recessed Recess Capsule
-    borderWidth: 1.5,
-    borderColor: C.primaryFixed, // Primary Matcha Glow border on focus
-    borderRadius: 9999, // Pill recessed capsule
-    paddingLeft: 18,
-    paddingRight: 8,
-    height: 48,
-    width: width - 80,
-    gap: 8,
-    shadowColor: C.primaryFixed,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-  },
-  inlineNameInput: {
-    flex: 1,
-    fontSize: 16,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: C.white,
-    padding: 0,
-  },
-  inlineActionBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+    /* Inline Editing */
+    inlineEditRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: C.surfaceContainerHigh, // Deep Recessed Recess Capsule
+      borderWidth: 1.5,
+      borderColor: C.primaryFixed, // Primary Matcha Glow border on focus
+      borderRadius: 9999, // Pill recessed capsule
+      paddingLeft: 18,
+      paddingRight: 8,
+      height: 48,
+      width: width - 80,
+      gap: 8,
+      shadowColor: C.primaryFixed,
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.15,
+      shadowRadius: 8,
+    },
+    inlineNameInput: {
+      flex: 1,
+      fontSize: 16,
+      fontFamily: 'PlusJakartaSans_500Medium',
+      color: C.onSurface,
+      padding: 0,
+    },
+    inlineActionBtn: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
 
-  /* Section Labels */
-  sectionLabel: {
-    fontSize: 12,
-    fontFamily: 'SpaceGrotesk_700Bold',
-    color: C.onSurfaceVariant,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    marginTop: 28,
-    marginBottom: 10,
-    marginLeft: 6,
-  },
+    /* Section Labels */
+    sectionLabel: {
+      fontSize: 12,
+      fontFamily: 'SpaceGrotesk_700Bold',
+      color: C.onSurfaceVariant,
+      letterSpacing: 2,
+      textTransform: 'uppercase',
+      marginTop: 28,
+      marginBottom: 10,
+      marginLeft: 6,
+    },
 
-  /* Statistics */
-  statsCard: {
-    width: '100%',
-    backgroundColor: C.cardBg,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: C.cardBorder,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: 20,
-    alignItems: 'center',
-  },
-  statBox: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-  },
-  statNum: {
-    fontSize: 22,
-    fontFamily: 'Sora_700Bold',
-    color: C.primaryFixed,
-    letterSpacing: -0.5,
-  },
-  statNumDate: {
-    fontSize: 16,
-    fontFamily: 'Sora_700Bold',
-    color: C.primaryFixed,
-    letterSpacing: -0.2,
-    paddingVertical: 3,
-  },
-  statLabel: {
-    fontSize: 9,
-    fontFamily: 'SpaceGrotesk_700Bold',
-    color: C.onSurfaceVariant,
-    letterSpacing: 1,
-  },
-  statDivider: {
-    width: 1,
-    height: 24,
-    backgroundColor: 'rgba(137,148,133,0.18)',
-  },
+    /* Statistics */
+    statsCard: {
+      width: '100%',
+      backgroundColor: C.cardBg,
+      borderRadius: 24,
+      borderWidth: 1,
+      borderColor: C.cardBorder,
+      flexDirection: 'row',
+      justifyContent: 'space-around',
+      paddingVertical: 20,
+      alignItems: 'center',
+    },
+    statBox: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 4,
+    },
+    statNum: {
+      fontSize: 22,
+      fontFamily: 'Sora_700Bold',
+      color: C.primaryFixed,
+      letterSpacing: -0.5,
+    },
+    statNumDate: {
+      fontSize: 16,
+      fontFamily: 'Sora_700Bold',
+      color: C.primaryFixed,
+      letterSpacing: -0.2,
+      paddingVertical: 3,
+    },
+    statLabel: {
+      fontSize: 9,
+      fontFamily: 'SpaceGrotesk_700Bold',
+      color: C.onSurfaceVariant,
+      letterSpacing: 1,
+    },
+    statDivider: {
+      width: 1,
+      height: 24,
+      backgroundColor: 'rgba(137,148,133,0.18)',
+    },
 
-  /* Settings Options */
-  optionsList: {
-    width: '100%',
-    backgroundColor: C.cardBg,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: C.cardBorder,
-    paddingVertical: 8,
-  },
-  optionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    width: '100%',
-  },
-  optionInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  optionIconBg: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  matchaTint: {
-    backgroundColor: 'rgba(150,249,150,0.08)',
-  },
-  peachTint: {
-    backgroundColor: 'rgba(255,181,156,0.08)',
-  },
-  optionLabel: {
-    fontSize: 15,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: C.onSurface,
-  },
-  versionText: {
-    fontSize: 13,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: C.onSurfaceVariant,
-    opacity: 0.7,
-  },
-  optionsRowDivider: {
-    height: 1,
-    backgroundColor: 'rgba(137,148,133,0.1)',
-    marginHorizontal: 16,
-  },
+    /* Settings Options */
+    optionsList: {
+      width: '100%',
+      backgroundColor: C.cardBg,
+      borderRadius: 24,
+      borderWidth: 1,
+      borderColor: C.cardBorder,
+      paddingVertical: 8,
+    },
+    optionRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      width: '100%',
+    },
+    optionInfo: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    optionIconBg: {
+      width: 38,
+      height: 38,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    matchaTint: {
+      backgroundColor: 'rgba(150,249,150,0.08)',
+    },
+    peachTint: {
+      backgroundColor: 'rgba(255,181,156,0.08)',
+    },
+    optionLabel: {
+      fontSize: 15,
+      fontFamily: 'PlusJakartaSans_500Medium',
+      color: C.onSurface,
+    },
+    versionText: {
+      fontSize: 13,
+      fontFamily: 'PlusJakartaSans_500Medium',
+      color: C.onSurfaceVariant,
+      opacity: 0.7,
+    },
+    optionsRowDivider: {
+      height: 1,
+      backgroundColor: 'rgba(137,148,133,0.1)',
+      marginHorizontal: 16,
+    },
 
-  /* Log Out Container */
-  logoutContainer: {
-    marginTop: 36,
-  },
-  logoutBtn: {
-    width: '100%',
-    backgroundColor: 'rgba(255,180,171,0.06)', // Recessed Peach container
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,180,171,0.18)', // High-end peach outline
-    paddingVertical: 17,
-    borderRadius: 9999, // Pill/Capsule shape
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: C.errorColor,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 2,
-  },
-  logoutText: {
-    color: '#ffb4ab', // Peach error tint
-    fontFamily: 'Sora_700Bold',
-    fontSize: 16,
-    letterSpacing: 0.2,
-  },
+    /* Log Out Container */
+    logoutContainer: {
+      marginTop: 36,
+    },
+    logoutBtn: {
+      width: '100%',
+      backgroundColor: C.errorBg,
+      borderWidth: 1.5,
+      borderColor: C.errorBorder,
+      paddingVertical: 17,
+      borderRadius: 9999, // Pill/Capsule shape
+      alignItems: 'center',
+      justifyContent: 'center',
+      shadowColor: C.errorColor,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.05,
+      shadowRadius: 10,
+      elevation: 2,
+    },
+    logoutText: {
+      color: C.errorText,
+      fontFamily: 'Sora_700Bold',
+      fontSize: 16,
+      letterSpacing: 0.2,
+    },
 
-  /* Tagline */
-  tagline: {
-    marginTop: 28,
-    color: C.onSurfaceVariant,
-    fontSize: 9,
-    fontFamily: 'SpaceGrotesk_700Bold',
-    letterSpacing: 3,
-    opacity: 0.35,
-    textAlign: 'center',
-  },
-  themeSelector: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(0,0,0,0.2)',
-    borderRadius: 12,
-    padding: 2,
-    gap: 2,
-  },
-  themeOption: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  themeOptionActive: {
-    backgroundColor: C.primary,
-  },
-  themeOptionText: {
-    fontSize: 12,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    color: C.onSurfaceVariant,
-  },
-  themeOptionTextActive: {
-    color: isDark ? '#002105' : '#ffffff',
-    fontWeight: '700',
-  },
-});
+    /* Tagline */
+    tagline: {
+      marginTop: 28,
+      color: C.onSurfaceVariant,
+      fontSize: 9,
+      fontFamily: 'SpaceGrotesk_700Bold',
+      letterSpacing: 3,
+      opacity: 0.35,
+      textAlign: 'center',
+    },
+  });
 }

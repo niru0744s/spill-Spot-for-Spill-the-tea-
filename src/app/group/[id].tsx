@@ -266,7 +266,7 @@ export default function GroupChatRoomScreen() {
             }
           }}
         >
-          <MaterialIcons name="arrow-back-ios" size={20} color={C.white} />
+          <MaterialIcons name="arrow-back-ios" size={20} color={C.onSurface} />
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.headerTitleContainer} onPress={handleHeaderPress} activeOpacity={0.8}>
@@ -292,7 +292,7 @@ export default function GroupChatRoomScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.settingsBtn} onPress={handleHeaderPress}>
-          <MaterialIcons name="info-outline" size={24} color={C.white} />
+          <MaterialIcons name="info-outline" size={24} color={C.onSurface} />
         </TouchableOpacity>
       </View>
 

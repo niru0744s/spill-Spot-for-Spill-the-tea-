@@ -258,7 +258,7 @@ export default function CreateGroupScreen() {
             }
           }}
         >
-          <MaterialIcons name="arrow-back-ios" size={20} color={C.white} />
+          <MaterialIcons name="arrow-back-ios" size={20} color={C.onSurface} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>New Group</Text>
         <View style={{ width: 40 }} />

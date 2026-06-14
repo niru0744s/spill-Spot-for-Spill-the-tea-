@@ -323,7 +323,7 @@ function getStyles(C: ThemeColors, isDark: boolean) {
   emptyTitle: {
     fontSize: 22,
     fontWeight: '800',
-    color: C.white,
+    color: C.onSurface,
     letterSpacing: -0.5,
   },
   emptySubtitle: {

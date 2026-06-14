@@ -718,7 +718,7 @@ function getStyles(C: ThemeColors, isDark: boolean) {
   errorBadgeText: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#ffb59c',
+    color: C.secondary,
     letterSpacing: 0.5,
   },
 
@@ -773,7 +773,7 @@ function getStyles(C: ThemeColors, isDark: boolean) {
   bannerTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#ffb59c',
+    color: C.secondary,
   },
   bannerSub: {
     fontSize: 13,
@@ -931,7 +931,7 @@ function getStyles(C: ThemeColors, isDark: boolean) {
   fabLabel: {
     fontSize: 14,
     fontWeight: '800',
-    color: '#00390d',
+    color: isDark ? '#00390d' : '#ffffff',
     letterSpacing: 0.2,
   },
 });

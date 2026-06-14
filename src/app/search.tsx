@@ -488,7 +488,7 @@ function getStyles(C: ThemeColors, isDark: boolean) {
   heroText: {
     fontSize: 34,
     fontWeight: '800',
-    color: C.white,
+    color: C.onSurface,
     lineHeight: 40,
     letterSpacing: -1,
   },
@@ -658,7 +658,7 @@ function getStyles(C: ThemeColors, isDark: boolean) {
   cardDisplayName: {
     fontSize: 17,
     fontWeight: '700',
-    color: C.white,
+    color: C.onSurface,
     letterSpacing: -0.2,
     includeFontPadding: false,
   },
