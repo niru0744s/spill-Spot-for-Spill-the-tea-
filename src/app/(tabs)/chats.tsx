@@ -25,6 +25,7 @@ import {
   ScrollView,
   Dimensions,
   Image,
+  Platform,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -337,6 +338,10 @@ export default function ChatsScreen() {
           keyExtractor={(item) => item.chatId}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
+          initialNumToRender={10}
+          maxToRenderPerBatch={8}
+          windowSize={11}
+          removeClippedSubviews={Platform.OS === 'android'}
           ListHeaderComponent={() => (
             <>
               {/* Page title */}

@@ -314,6 +314,10 @@ export default function GroupChatRoomScreen() {
         onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
         onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
         showsVerticalScrollIndicator={false}
+        initialNumToRender={15}
+        maxToRenderPerBatch={10}
+        windowSize={11}
+        removeClippedSubviews={Platform.OS === 'android'}
       />
 
       {/* Input / Removed Banner Area */}
