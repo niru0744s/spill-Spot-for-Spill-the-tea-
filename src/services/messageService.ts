@@ -39,6 +39,7 @@ import {
   incrementUnread,
   saveChatMeta,
   updateMessageStatus,
+  getMessagePreview,
   type ChatMeta,
   type StoredMessage,
 } from './chatStorage';
@@ -112,7 +113,7 @@ export async function sendMessage({
   chatId: string;
   senderUid: string;
   content: string;
-  type?: 'TEXT' | 'IMAGE';
+  type?: 'TEXT' | 'IMAGE' | 'TRANSACTION' | 'PAYMENT_REQUEST';
   partnerMeta?: Partial<ChatMeta>;
 }): Promise<StoredMessage> {
   const createdAt = Date.now();
@@ -142,7 +143,7 @@ export async function sendMessage({
       partnerName: partnerMeta.partnerName ?? '',
       partnerPhoto: partnerMeta.partnerPhoto ?? null,
       partnerOnline: partnerMeta.partnerOnline ?? false,
-      lastMessage: content,
+      lastMessage: getMessagePreview(msg),
       lastMessageAt: createdAt,
       isBackedUp: false,
     });
@@ -179,7 +180,7 @@ async function uploadToFirestore(chatId: string, msg: StoredMessage, partnerUid?
   await setDoc(
     chatDocRef(chatId),
     {
-      lastMessage: msg.content,
+      lastMessage: getMessagePreview(msg),
       lastMessageAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     },
@@ -223,7 +224,7 @@ async function uploadToFirestore(chatId: string, msg: StoredMessage, partnerUid?
       partnerUid:    msg.senderUid,
       partnerName:   senderName,
       partnerPhoto:  senderPhoto,
-      lastMessage:   msg.content,
+      lastMessage:   getMessagePreview(msg),
       lastMessageAt: serverTimestamp(),
       // Only increment unread if they are NOT inside the active chat screen
       unread:        isPartnerOnChat ? 0 : increment(1),
@@ -237,7 +238,7 @@ async function uploadToFirestore(chatId: string, msg: StoredMessage, partnerUid?
       partnerUid:    actualPartnerUid,
       partnerName:   partnerMeta?.partnerName ?? 'Tea Friend',
       partnerPhoto:  partnerMeta?.partnerPhoto ?? null,
-      lastMessage:   msg.content,
+      lastMessage:   getMessagePreview(msg),
       lastMessageAt: serverTimestamp(),
       unread:        0, // We sent the message, so unread remains 0
     }, { merge: true });
@@ -257,7 +258,7 @@ async function uploadToFirestore(chatId: string, msg: StoredMessage, partnerUid?
         await sendPushNotification({
           to: pushToken!,
           title: senderName,
-          body: msg.content,
+          body: getMessagePreview(msg),
           data: {
             chatId,
             senderUid:     msg.senderUid,

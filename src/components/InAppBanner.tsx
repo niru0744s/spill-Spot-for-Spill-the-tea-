@@ -13,7 +13,7 @@ import {
   TouchableOpacity,
   Animated,
   Image,
-  Dimensions,
+  useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBannerStore } from '@/store/bannerStore';
@@ -21,11 +21,10 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 import { ThemeColors } from '@/types/theme';
 
-const { width } = Dimensions.get('window');
-
 export function InAppBanner() {
   const { colors: C, isDark } = useTheme();
-  const styles = getStyles(C, isDark);
+  const { width } = useWindowDimensions();
+  const styles = getStyles(C, isDark, width);
   const insets = useSafeAreaInsets();
   const { visible, title, message, photoURL, onPress, hideBanner } = useBannerStore();
   
@@ -127,7 +126,7 @@ export function InAppBanner() {
   );
 }
 
-const getStyles = (C: ThemeColors, isDark: boolean) => StyleSheet.create({
+const getStyles = (C: ThemeColors, isDark: boolean, width: number) => StyleSheet.create({
   bannerContainer: {
     position: 'absolute',
     left: 0,

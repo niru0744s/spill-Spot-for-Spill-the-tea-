@@ -38,7 +38,6 @@ import {
   ScrollView,
   Animated,
   Easing,
-  Dimensions,
   ActivityIndicator,
   Image,
 } from 'react-native';
@@ -51,8 +50,6 @@ import { isUserOnline, getMillis } from '@/services/presenceService';
 import { triggerSelection } from '@/services/hapticService';
 import { useTheme, useStyles } from '@/hooks/useTheme';
 import { ThemeColors } from '@/types/theme';
-
-const { width, height } = Dimensions.get('window');
 
 /* ── Ambient orb background ────────────────────────────────── */
 function AmbientOrbs() {

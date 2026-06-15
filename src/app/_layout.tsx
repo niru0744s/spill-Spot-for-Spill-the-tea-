@@ -150,6 +150,18 @@ function RootLayoutContent() {
           name="chat/[id]"
           options={{ animation: 'slide_from_right' }}
         />
+        <Stack.Screen
+          name="settings"
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="transactions"
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="call-history"
+          options={{ animation: 'slide_from_right' }}
+        />
       </Stack>
       <InAppBanner />
       <CallScreen />

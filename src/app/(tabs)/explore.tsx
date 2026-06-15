@@ -33,7 +33,6 @@ import {
   Image,
   Linking,
   Platform,
-  Dimensions,
 } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -55,10 +54,6 @@ import { ThemeColors } from '@/types/theme';
 // ---------------------------------------------------------------------------
 // Design tokens (matching DESIGN.md — no imports, keep self-contained)
 // ---------------------------------------------------------------------------
-
-
-const { width: SCREEN_W } = Dimensions.get('window');
-
 
 // ---------------------------------------------------------------------------
 // Static fallback cards (shown when API is unavailable)
@@ -313,7 +308,7 @@ function FeedCard({ article, index }: { article: NewsArticle; index: number }) {
 }
 
 /** Floating edit FAB */
-function EditFAB({ onPress }: { onPress: () => void }) {
+function EditFAB({ onPress, bottomOffset }: { onPress: () => void; bottomOffset: number }) {
   const styles = useStyles(getStyles);
   const scale = useSharedValue(1);
   const onPressIn  = () => {
@@ -328,7 +323,7 @@ function EditFAB({ onPress }: { onPress: () => void }) {
   }));
 
   return (
-    <Animated.View style={[styles.fab, animatedStyle]}>
+    <Animated.View style={[styles.fab, { bottom: bottomOffset }, animatedStyle]}>
       <TouchableOpacity
         onPress={onPress}
         onPressIn={onPressIn}
@@ -614,7 +609,7 @@ export default function ExploreScreen() {
         }
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingBottom: insets.bottom + 100 },
+          { paddingBottom: Math.max(insets.bottom + 100, 112) },
         ]}
         showsVerticalScrollIndicator={false}
         onEndReached={loadMore}
@@ -634,7 +629,7 @@ export default function ExploreScreen() {
       />
 
       {/* ── Floating Edit FAB (only when niches are set) ───────────────── */}
-      {hasNiches && <EditFAB onPress={() => setSheetOpen(true)} />}
+      {hasNiches && <EditFAB onPress={() => setSheetOpen(true)} bottomOffset={Math.max(insets.bottom + 84, 90)} />}
 
       {/* ── Edit Niches Bottom Sheet ────────────────────────────────────── */}
       <EditNichesSheet
@@ -911,7 +906,6 @@ function getStyles(C: ThemeColors, isDark: boolean) {
   // ── FAB ───────────────────────────────────────────────────────────────────
   fab: {
     position: 'absolute',
-    bottom: 90,
     right: 20,
     shadowColor: C.primary,
     shadowOffset: { width: 0, height: 4 },

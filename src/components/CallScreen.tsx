@@ -13,8 +13,7 @@ import {
   View,
   TouchableOpacity,
   Image,
-  Dimensions,
-  Platform,
+  useWindowDimensions,
   ActivityIndicator,
 } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
@@ -28,11 +27,18 @@ import {
   RtcSurfaceView,
   IRtcEngine,
 } from 'react-native-agora';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const { width, height } = Dimensions.get('window');
 const AGORA_APP_ID = process.env.EXPO_PUBLIC_AGORA_APP_ID || '';
 
 export function CallScreen() {
+  const insets = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
+  const isCompact = width < 360 || height < 680;
+  const pipWidth = Math.min(120, Math.max(88, width * 0.3));
+  const pipHeight = Math.round(pipWidth * 1.32);
+  const overlayTop = insets.top + 20;
+  const controlsBottom = Math.max(insets.bottom + 18, 34);
   const {
     callId,
     partnerUid,
@@ -212,7 +218,7 @@ export function CallScreen() {
   // ---------------------------------------------------------------------------
   if (status === 'ringing' && isIncoming) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { paddingTop: overlayTop, paddingBottom: controlsBottom }]}>
         <View style={styles.infoArea}>
           <Image
             source={
@@ -222,7 +228,7 @@ export function CallScreen() {
             }
             style={styles.avatarLarge}
           />
-          <Text style={styles.nameText}>{partnerName}</Text>
+          <Text style={styles.nameText} numberOfLines={1}>{partnerName}</Text>
           <Text style={styles.statusText}>
             Incoming {type === 'video' ? 'Video' : 'Voice'} Call...
           </Text>
@@ -254,7 +260,7 @@ export function CallScreen() {
   // ---------------------------------------------------------------------------
   if (status === 'dialing' && !isIncoming) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { paddingTop: overlayTop, paddingBottom: controlsBottom }]}>
         <View style={styles.infoArea}>
           <Image
             source={
@@ -264,7 +270,7 @@ export function CallScreen() {
             }
             style={styles.avatarLarge}
           />
-          <Text style={styles.nameText}>{partnerName}</Text>
+          <Text style={styles.nameText} numberOfLines={1}>{partnerName}</Text>
           <Text style={styles.statusText}>Calling...</Text>
         </View>
 
@@ -288,7 +294,7 @@ export function CallScreen() {
     const isVideo = type === 'video';
 
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { paddingTop: overlayTop, paddingBottom: controlsBottom }]}>
         {/* MEDIA VIEWPORT */}
         {isVideo ? (
           <View style={styles.videoGrid}>
@@ -306,7 +312,17 @@ export function CallScreen() {
             )}
 
             {/* Local Preview (PiP) */}
-            <View style={styles.localPipWindow}>
+            <View
+              style={[
+                styles.localPipWindow,
+                {
+                  top: overlayTop,
+                  right: Math.max(16, insets.right + 16),
+                  width: pipWidth,
+                  height: pipHeight,
+                },
+              ]}
+            >
               <RtcSurfaceView
                 canvas={{ uid: 0 }}
                 style={StyleSheet.absoluteFill}
@@ -324,7 +340,7 @@ export function CallScreen() {
               }
               style={[styles.avatarLarge, styles.avatarPulse]}
             />
-            <Text style={styles.nameText}>{partnerName}</Text>
+            <Text style={styles.nameText} numberOfLines={1}>{partnerName}</Text>
             {isJoining ? (
               <Text style={styles.statusText}>Connecting audio...</Text>
             ) : (
@@ -335,18 +351,18 @@ export function CallScreen() {
 
         {/* TOP OVERLAY (Video Call Metadata) */}
         {isVideo && (
-          <View style={styles.topOverlay}>
-            <Text style={styles.topNameText}>{partnerName}</Text>
+          <View style={[styles.topOverlay, { top: overlayTop, left: Math.max(16, insets.left + 16), right: pipWidth + 36 }]}>
+            <Text style={styles.topNameText} numberOfLines={1}>{partnerName}</Text>
             <Text style={styles.topTimerText}>{formatDuration(duration)}</Text>
           </View>
         )}
 
         {/* BOTTOM CONTROLS BAR */}
-        <View style={styles.controlBarContainer}>
-          <View style={styles.controlBar}>
+        <View style={[styles.controlBarContainer, { bottom: controlsBottom }]}>
+          <View style={[styles.controlBar, isCompact && styles.controlBarCompact]}>
             {/* Mute */}
             <TouchableOpacity
-              style={[styles.controlBtn, isMuted && styles.controlBtnActive]}
+              style={[styles.controlBtn, isCompact && styles.controlBtnCompact, isMuted && styles.controlBtnActive]}
               onPress={toggleMute}
               activeOpacity={0.8}
             >
@@ -359,7 +375,7 @@ export function CallScreen() {
 
             {/* Speakerphone */}
             <TouchableOpacity
-              style={[styles.controlBtn, isSpeaker && styles.controlBtnActive]}
+              style={[styles.controlBtn, isCompact && styles.controlBtnCompact, isSpeaker && styles.controlBtnActive]}
               onPress={toggleSpeaker}
               activeOpacity={0.8}
             >
@@ -373,7 +389,7 @@ export function CallScreen() {
             {/* Camera Switch (Video Only) */}
             {isVideo && (
               <TouchableOpacity
-                style={styles.controlBtn}
+                style={[styles.controlBtn, isCompact && styles.controlBtnCompact]}
                 onPress={handleToggleCamera}
                 activeOpacity={0.8}
               >
@@ -383,7 +399,7 @@ export function CallScreen() {
 
             {/* End Call */}
             <TouchableOpacity
-              style={[styles.btnRound, styles.btnDecline, styles.controlHangup]}
+              style={[styles.btnRound, styles.btnDecline, styles.controlHangup, isCompact && styles.controlHangupCompact]}
               onPress={() => callId && endCall(callId)}
               activeOpacity={0.8}
             >
@@ -432,6 +448,8 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontFamily: 'PlusJakartaSans-Bold',
     marginBottom: 8,
+    maxWidth: '88%',
+    textAlign: 'center',
   },
   statusText: {
     color: '#7ADC7D',
@@ -547,6 +565,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(122, 220, 125, 0.2)',
   },
+  controlBarCompact: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
   controlBtn: {
     width: 48,
     height: 48,
@@ -556,6 +578,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginHorizontal: 12,
   },
+  controlBtnCompact: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    marginHorizontal: 5,
+  },
   controlBtnActive: {
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
   },
@@ -564,5 +592,11 @@ const styles = StyleSheet.create({
     height: 52,
     borderRadius: 26,
     marginHorizontal: 12,
+  },
+  controlHangupCompact: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    marginHorizontal: 5,
   },
 });

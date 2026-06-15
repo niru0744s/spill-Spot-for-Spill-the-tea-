@@ -20,6 +20,7 @@
 
 import { auth, db } from '@/config/firebase';
 import { useRealtimeChat } from '@/hooks/useRealtimeChat';
+import { useWallet } from '@/hooks/useWallet';
 import { setActiveChatId } from '@/services/activeChat';
 import type { StoredMessage } from '@/services/chatStorage';
 import { buildChatId, clearDraft, getChatMeta, getDraft, saveChatMeta, saveDraft, editMessageLocally, deleteMessageLocally, markMessageAsDeletedLocally } from '@/services/chatStorage';
@@ -51,6 +52,7 @@ import {
   Platform,
   StyleSheet,
   Image,
+  useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image as ExpoImage } from 'expo-image';
@@ -160,6 +162,8 @@ const AudioPlayerBubbleInner = memo(function AudioPlayerBubbleInner({
 }) {
   const { colors: C } = useTheme();
   const styles = useStyles(getStyles);
+  const { width: windowWidth } = useWindowDimensions();
+  const audioWidth = Math.min(200, Math.max(162, windowWidth * 0.54));
   const audioSource = Platform.OS === 'android' && localUri.startsWith('file://')
     ? localUri.replace('file://', '')
     : localUri;
@@ -214,7 +218,7 @@ const AudioPlayerBubbleInner = memo(function AudioPlayerBubbleInner({
   const progressPct = duration ? (currentTime / duration) * 100 : 0;
 
   return (
-    <View style={styles.audioBubble}>
+    <View style={[styles.audioBubble, { width: audioWidth }]}>
       <TouchableOpacity onPress={handlePlayPause} style={styles.audioPlayBtn} activeOpacity={0.85}>
         <MaterialIcons name={isPlaying ? 'pause' : 'play-arrow'} size={20} color={C.onPrimaryFixed} />
       </TouchableOpacity>
@@ -241,9 +245,11 @@ const AudioPlayerBubble = memo(function AudioPlayerBubble({
 }) {
   const { colors: C } = useTheme();
   const styles = useStyles(getStyles);
+  const { width: windowWidth } = useWindowDimensions();
+  const audioWidth = Math.min(200, Math.max(162, windowWidth * 0.54));
   if (!localUri) {
     return (
-      <View style={styles.audioBubble}>
+      <View style={[styles.audioBubble, { width: audioWidth }]}>
         <ActivityIndicator size="small" color={C.onSurfaceVariant} />
         <Text style={styles.mediaPlaceholderText}>Loading audio...</Text>
       </View>
@@ -262,6 +268,8 @@ const MessageBubble = memo(function MessageBubble({
   setLightboxVisible,
   setVideoPlayerUri,
   setVideoModalVisible,
+  payRequest,
+  declineRequest,
 }: {
   item: StoredMessage;
   prevItem?: StoredMessage;
@@ -270,9 +278,16 @@ const MessageBubble = memo(function MessageBubble({
   setLightboxVisible: (visible: boolean) => void;
   setVideoPlayerUri: (uri: string | null) => void;
   setVideoModalVisible: (visible: boolean) => void;
+  payRequest?: (requestId: string) => Promise<{ success: boolean; message: string }>;
+  declineRequest?: (requestId: string) => Promise<{ success: boolean; message: string }>;
 }) {
   const { colors: C, isDark } = useTheme();
   const styles = useStyles(getStyles);
+  const { width: windowWidth } = useWindowDimensions();
+  const compactMediaWidth = Math.min(220, Math.max(168, windowWidth * 0.58));
+  const compactVideoHeight = Math.round(compactMediaWidth * 0.64);
+  const compactImageHeight = Math.round(compactMediaWidth * 0.72);
+  const compactCardWidth = Math.min(220, Math.max(172, windowWidth * 0.6));
   const isGrouped = prevItem &&
     prevItem.isMine === item.isMine &&
     item.createdAt - prevItem.createdAt < 60_000; // within 1 minute
@@ -310,7 +325,7 @@ const MessageBubble = memo(function MessageBubble({
 
     if (item.type === 'IMAGE') {
       return (
-        <View style={styles.imageBubbleWrap}>
+        <View style={[styles.imageBubbleWrap, { width: compactMediaWidth, height: compactImageHeight }]}>
           {item.localUri ? (
             <ExpoImage source={{ uri: item.localUri }} style={styles.imageBubble} contentFit="cover" />
           ) : (
@@ -330,7 +345,7 @@ const MessageBubble = memo(function MessageBubble({
 
     if (item.type === 'VIDEO') {
       return (
-        <View style={styles.videoBubbleWrap}>
+        <View style={[styles.videoBubbleWrap, { width: compactMediaWidth, height: compactVideoHeight }]}>
           {item.localUri ? (
             <View style={{ position: 'relative', width: '100%', height: '100%' }}>
               <View style={styles.videoThumbnailPlaceholder}>
@@ -365,7 +380,7 @@ const MessageBubble = memo(function MessageBubble({
     if (item.type === 'FILE') {
       const sizeMB = item.fileSize ? (item.fileSize / (1024 * 1024)).toFixed(1) : '?';
       return (
-        <View style={styles.fileBubble}>
+        <View style={[styles.fileBubble, { width: compactCardWidth }]}>
           <View style={styles.fileIconBg}>
             <MaterialIcons name="insert-drive-file" size={20} color={C.onPrimaryFixed} />
           </View>
@@ -388,6 +403,177 @@ const MessageBubble = memo(function MessageBubble({
       );
     }
 
+    if (item.type === 'TRANSACTION') {
+      let txData: { amount: number; type: string; reference: string; note?: string } | null = null;
+      try {
+        txData = JSON.parse(item.content);
+      } catch (e) {}
+
+      if (txData) {
+        const isMine = item.isMine;
+        const amountStr = `₹${(txData.amount / 100).toFixed(2)}`;
+        return (
+          <View style={[styles.transactionCard, { width: compactCardWidth, backgroundColor: isMine ? (isDark ? 'rgba(76,175,80,0.12)' : 'rgba(76,175,80,0.06)') : (isDark ? 'rgba(244,67,54,0.12)' : 'rgba(244,67,54,0.06)') }]}>
+            <View style={styles.transactionHeader}>
+              <MaterialIcons
+                name={isMine ? 'arrow-upward' : 'arrow-downward'}
+                size={18}
+                color={isMine ? C.primary : C.errorColor}
+              />
+              <Text style={[styles.transactionTitle, { color: C.onSurface }]}>
+                {isMine ? 'Sent Funds' : 'Received Funds'}
+              </Text>
+            </View>
+            <Text style={[styles.transactionAmount, { color: isMine ? C.primary : C.errorColor }]}>
+              {isMine ? `-${amountStr}` : `+${amountStr}`}
+            </Text>
+            {!!txData.note && (
+              <Text style={[styles.transactionNote, { color: C.onSurfaceVariant }]}>
+                "{txData.note}"
+              </Text>
+            )}
+            <Text style={[styles.transactionRef, { color: C.onSurfaceVariant }]}>
+              Ref: {txData.reference}
+            </Text>
+          </View>
+        );
+      }
+    }
+
+    if (item.type === 'PAYMENT_REQUEST') {
+      let reqData: { requestId: string; amount: number; note: string; status: string } | null = null;
+      try {
+        reqData = JSON.parse(item.content);
+      } catch (e) {}
+
+      if (reqData) {
+        const isMine = item.isMine;
+        const amountStr = `₹${(reqData.amount / 100).toFixed(2)}`;
+        
+        // State and Effect inside bubble to sync the request status from Firestore
+        const [reqStatus, setReqStatus] = useState<string>(reqData.status || 'PENDING');
+        const [isProcessing, setIsProcessing] = useState(false);
+
+        useEffect(() => {
+          if (!reqData?.requestId) return;
+          if (reqStatus === 'PAID' || reqStatus === 'DECLINED') {
+            return; // Skip listener if status is already terminal
+          }
+          const docRef = doc(db, 'paymentRequests', reqData.requestId);
+          const unsub = onSnapshot(docRef, (snap) => {
+            if (snap.exists()) {
+              const status = snap.data().status;
+              if (status !== reqStatus) {
+                setReqStatus(status);
+                // Persist the updated status inside the message content locally in MMKV
+                try {
+                  const updatedContent = JSON.stringify({
+                    ...reqData,
+                    status: status,
+                  });
+                  editMessageLocally(item.chatId, item.id, updatedContent);
+                } catch (err) {
+                  console.warn('[MessageBubble] Failed to save updated request status locally:', err);
+                }
+              }
+            }
+          });
+          return () => unsub();
+        }, [reqData?.requestId, reqStatus, item.chatId, item.id]);
+
+        const handlePay = async () => {
+          if (!payRequest || !reqData?.requestId) return;
+          setIsProcessing(true);
+          try {
+            const res = await payRequest(reqData.requestId);
+            if (!res.success) {
+              alert(res.message);
+            }
+          } catch (err: any) {
+            alert(err.message || 'Payment failed.');
+          } finally {
+            setIsProcessing(false);
+          }
+        };
+
+        const handleDecline = async () => {
+          if (!declineRequest || !reqData?.requestId) return;
+          setIsProcessing(true);
+          try {
+            const res = await declineRequest(reqData.requestId);
+            if (!res.success) {
+              alert(res.message);
+            }
+          } catch (err: any) {
+            alert(err.message || 'Decline failed.');
+          } finally {
+            setIsProcessing(false);
+          }
+        };
+
+        return (
+          <View style={[styles.transactionCard, { width: compactCardWidth, backgroundColor: C.surfaceContainerHighest }]}>
+            <View style={styles.transactionHeader}>
+              <MaterialIcons name="payment" size={18} color={C.primary} />
+              <Text style={[styles.transactionTitle, { color: C.onSurface }]}>
+                Payment Request
+              </Text>
+            </View>
+            <Text style={[styles.transactionAmount, { color: C.onSurface }]}>
+              {amountStr}
+            </Text>
+            <Text style={[styles.transactionNote, { color: C.onSurfaceVariant }]}>
+              "{reqData.note}"
+            </Text>
+            
+            {reqStatus === 'PENDING' ? (
+              isMine ? (
+                <View style={styles.requestBadge}>
+                  <Text style={[styles.requestBadgeText, { color: C.onSurfaceVariant }]}>
+                    Requested • Pending
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.requestActions}>
+                  <TouchableOpacity
+                    style={[styles.requestButton, styles.declineButton]}
+                    onPress={handleDecline}
+                    disabled={isProcessing}
+                    activeOpacity={0.7}
+                  >
+                    {isProcessing ? (
+                      <ActivityIndicator size="small" color={C.onSurfaceVariant} />
+                    ) : (
+                      <Text style={styles.declineButtonText}>Decline</Text>
+                    )}
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    style={[styles.requestButton, styles.payButton]}
+                    onPress={handlePay}
+                    disabled={isProcessing}
+                    activeOpacity={0.7}
+                  >
+                    {isProcessing ? (
+                      <ActivityIndicator size="small" color={C.white} />
+                    ) : (
+                      <Text style={styles.payButtonText}>Pay Now</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              )
+            ) : (
+              <View style={[styles.requestBadge, { backgroundColor: reqStatus === 'PAID' ? (isDark ? 'rgba(76,175,80,0.15)' : 'rgba(76,175,80,0.08)') : 'rgba(0,0,0,0.05)' }]}>
+                <Text style={[styles.requestBadgeText, { color: reqStatus === 'PAID' ? C.primary : C.onSurfaceVariant }]}>
+                  {reqStatus === 'PAID' ? 'Paid ✓' : 'Declined ✗'}
+                </Text>
+              </View>
+            )}
+          </View>
+        );
+      }
+    }
+
     return (
       <Text style={[styles.bubbleText, isMine ? styles.bubbleTextOut : styles.bubbleTextIn]}>
         {item.content}
@@ -395,7 +581,7 @@ const MessageBubble = memo(function MessageBubble({
     );
   };
 
-  const isMedia = item.type !== 'TEXT';
+  const isMedia = item.type !== 'TEXT' && item.type !== 'TRANSACTION' && item.type !== 'PAYMENT_REQUEST';
 
   return (
     <View style={[
@@ -490,6 +676,8 @@ export default function ChatRoomScreen() {
   const styles = useStyles(getStyles);
   const router  = useRouter();
   const insets  = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
+  const isNarrowScreen = windowWidth < 360;
   const params  = useLocalSearchParams<{
     id: string;
     username: string;
@@ -577,6 +765,105 @@ export default function ChatRoomScreen() {
     notifyTyping,
     stopTyping,
   } = useRealtimeChat(chatId);
+
+  const { sendMoney, requestMoney, payRequest, declineRequest } = useWallet();
+
+  // Wallet specific modals and input states
+  const [sendMoneyModalVisible, setSendMoneyModalVisible] = useState(false);
+  const [requestMoneyModalVisible, setRequestMoneyModalVisible] = useState(false);
+  const [walletAmount, setWalletAmount] = useState('');
+  const [walletNote, setWalletNote] = useState('');
+  const [isSubmittingWallet, setIsSubmittingWallet] = useState(false);
+
+  const handleSendMoneySubmit = async () => {
+    const amount = parseFloat(walletAmount);
+    if (isNaN(amount) || amount <= 0) {
+      alert('Please enter a valid amount.');
+      return;
+    }
+    setIsSubmittingWallet(true);
+    try {
+      const res = await sendMoney(partnerUid, amount);
+      if (res.success) {
+        // Success! Now send a TRANSACTION message in the chat
+        const msg = await sendMsg({
+          chatId,
+          senderUid: currentUid,
+          content: JSON.stringify({
+            amount: Math.round(amount * 100),
+            type: 'SEND_FUNDS',
+            reference: (res as any).reference || 'unknown',
+            note: walletNote.trim(),
+          }),
+          type: 'TRANSACTION',
+          partnerMeta: {
+            partnerUid,
+            partnerName: username,
+            partnerPhoto: photoURL,
+            partnerOnline: isOnline,
+          },
+        });
+        appendLocalMessage(msg);
+        setSendMoneyModalVisible(false);
+        setWalletAmount('');
+        setWalletNote('');
+        alert(res.message);
+      } else {
+        alert(res.message);
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to transfer funds.');
+    } finally {
+      setIsSubmittingWallet(false);
+    }
+  };
+
+  const handleRequestMoneySubmit = async () => {
+    const amount = parseFloat(walletAmount);
+    if (isNaN(amount) || amount <= 0) {
+      alert('Please enter a valid amount.');
+      return;
+    }
+    const noteText = walletNote.trim();
+    if (!noteText) {
+      alert('Please enter a description/note for the request.');
+      return;
+    }
+    setIsSubmittingWallet(true);
+    try {
+      const res = await requestMoney(partnerUid, amount, noteText);
+      if (res.success && res.request) {
+        // Success! Now send a PAYMENT_REQUEST message in the chat
+        const msg = await sendMsg({
+          chatId,
+          senderUid: currentUid,
+          content: JSON.stringify({
+            requestId: res.request.id,
+            amount: Math.round(amount * 100),
+            note: noteText,
+            status: 'PENDING',
+          }),
+          type: 'PAYMENT_REQUEST',
+          partnerMeta: {
+            partnerUid,
+            partnerName: username,
+            partnerPhoto: photoURL,
+            partnerOnline: isOnline,
+          },
+        });
+        appendLocalMessage(msg);
+        setRequestMoneyModalVisible(false);
+        setWalletAmount('');
+        setWalletNote('');
+      } else {
+        alert(res.message);
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to request money.');
+    } finally {
+      setIsSubmittingWallet(false);
+    }
+  };
 
   const [selectedMessage, setSelectedMessage] = useState<StoredMessage | null>(null);
   const [optionsModalVisible, setOptionsModalVisible] = useState(false);
@@ -1103,6 +1390,8 @@ export default function ChatRoomScreen() {
         setLightboxVisible={setLightboxVisible}
         setVideoPlayerUri={setVideoPlayerUri}
         setVideoModalVisible={setVideoModalVisible}
+        payRequest={payRequest}
+        declineRequest={declineRequest}
       />
     );
   };
@@ -1110,7 +1399,7 @@ export default function ChatRoomScreen() {
   return (
     <KeyboardAvoidingView
       style={[styles.container, { paddingTop: insets.top }]}
-      behavior="padding"
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
     >
 
@@ -1138,15 +1427,19 @@ export default function ChatRoomScreen() {
             )}
             {isUserOnline(partnerLastSeen, partnerOnline) && <View style={styles.headerOnlineDot} />}
           </View>
-          <View>
-            <Text style={styles.headerName}>{username}</Text>
-            <Text style={[styles.headerStatus, isUserOnline(partnerLastSeen, partnerOnline) && styles.headerStatusOnline]}>
+          <View style={styles.headerTextBlock}>
+            <Text style={styles.headerName} numberOfLines={1} ellipsizeMode="tail">{username}</Text>
+            <Text
+              style={[styles.headerStatus, isUserOnline(partnerLastSeen, partnerOnline) && styles.headerStatusOnline]}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
               {presenceLabel}
             </Text>
           </View>
         </TouchableOpacity>
 
-        <View style={styles.headerActions}>
+        <View style={[styles.headerActions, isNarrowScreen && styles.headerActionsCompact]}>
           <TouchableOpacity
             style={styles.headerIconBtn}
             activeOpacity={0.7}
@@ -1188,8 +1481,8 @@ export default function ChatRoomScreen() {
       />
 
       {/* ── Input bar ────────────────────────────────── */}
-      <View style={[styles.inputBar, { paddingBottom: insets.bottom + 10 }]}>
-          <TouchableOpacity style={styles.inputIconBtn} activeOpacity={0.7} onPress={() => setAttachmentModalVisible(true)}>
+      <View style={[styles.inputBar, isNarrowScreen && styles.inputBarCompact, { paddingBottom: insets.bottom + 10 }]}>
+          <TouchableOpacity style={[styles.inputIconBtn, isNarrowScreen && styles.inputIconBtnCompact]} activeOpacity={0.7} onPress={() => setAttachmentModalVisible(true)}>
             <MaterialIcons name="add-circle-outline" size={26} color={C.onSurfaceVariant} />
           </TouchableOpacity>
 
@@ -1213,7 +1506,7 @@ export default function ChatRoomScreen() {
           </View>
 
           <TouchableOpacity
-            style={[styles.sendBtn, inputText.trim().length > 0 && styles.sendBtnActive]}
+            style={[styles.sendBtn, isNarrowScreen && styles.sendBtnCompact, inputText.trim().length > 0 && styles.sendBtnActive]}
             onPress={handleSend}
             activeOpacity={0.8}
           >
@@ -1299,7 +1592,7 @@ export default function ChatRoomScreen() {
       >
         <KeyboardAvoidingView
           style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
           <TouchableOpacity
             style={styles.modalOverlay}
@@ -1309,7 +1602,11 @@ export default function ChatRoomScreen() {
               setSelectedMessage(null);
             }}
           >
-            <View style={[styles.modalContent, styles.editModalContent]} onStartShouldSetResponder={() => true}>
+            <View 
+              style={[styles.modalContent, styles.editModalContent]} 
+              onStartShouldSetResponder={() => true}
+              {...(Platform.OS === 'web' ? { onClick: (e: any) => e.stopPropagation() } : {})}
+            >
               <Text style={styles.modalTitle}>Edit Message</Text>
               
               <View style={styles.editInputPill}>
@@ -1362,7 +1659,7 @@ export default function ChatRoomScreen() {
           activeOpacity={1}
           onPress={() => setAttachmentModalVisible(false)}
         >
-          <View style={styles.attachmentModalContent}>
+          <View style={[styles.attachmentModalContent, { paddingBottom: Math.max(insets.bottom + 20, 24) }]}>
             <View style={styles.attachmentModalHeader}>
               <Text style={styles.attachmentModalTitle}>Share Media</Text>
               <TouchableOpacity onPress={() => setAttachmentModalVisible(false)}>
@@ -1375,32 +1672,230 @@ export default function ChatRoomScreen() {
                 <View style={styles.attachmentOptionIconBg}>
                   <MaterialIcons name="photo-camera" size={26} color={C.primaryFixedDim} />
                 </View>
-                <Text style={styles.attachmentOptionLabel}>Camera</Text>
+                <Text style={styles.attachmentOptionLabel} numberOfLines={1}>Camera</Text>
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.attachmentOptionBtn} onPress={handlePickMedia} activeOpacity={0.75}>
                 <View style={styles.attachmentOptionIconBg}>
                   <MaterialIcons name="image" size={26} color={C.primaryFixedDim} />
                 </View>
-                <Text style={styles.attachmentOptionLabel}>Gallery</Text>
+                <Text style={styles.attachmentOptionLabel} numberOfLines={1}>Gallery</Text>
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.attachmentOptionBtn} onPress={handlePickDocument} activeOpacity={0.75}>
                 <View style={styles.attachmentOptionIconBg}>
                   <MaterialIcons name="insert-drive-file" size={26} color={C.primaryFixedDim} />
                 </View>
-                <Text style={styles.attachmentOptionLabel}>Document</Text>
+                <Text style={styles.attachmentOptionLabel} numberOfLines={1}>Document</Text>
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.attachmentOptionBtn} onPress={startRecording} activeOpacity={0.75}>
                 <View style={styles.attachmentOptionIconBg}>
                   <MaterialIcons name="mic" size={26} color={C.primaryFixedDim} />
                 </View>
-                <Text style={styles.attachmentOptionLabel}>Voice Note</Text>
+                <Text style={styles.attachmentOptionLabel} numberOfLines={1}>Voice Note</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.attachmentOptionBtn}
+                onPress={() => {
+                  setAttachmentModalVisible(false);
+                  setSendMoneyModalVisible(true);
+                }}
+                activeOpacity={0.75}
+              >
+                <View style={styles.attachmentOptionIconBg}>
+                  <MaterialIcons name="attach-money" size={26} color={C.primaryFixedDim} />
+                </View>
+                <Text style={styles.attachmentOptionLabel} numberOfLines={1}>Send Money</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.attachmentOptionBtn}
+                onPress={() => {
+                  setAttachmentModalVisible(false);
+                  setRequestMoneyModalVisible(true);
+                }}
+                activeOpacity={0.75}
+              >
+                <View style={styles.attachmentOptionIconBg}>
+                  <MaterialIcons name="payment" size={26} color={C.primaryFixedDim} />
+                </View>
+                <Text style={styles.attachmentOptionLabel} numberOfLines={1}>Request</Text>
               </TouchableOpacity>
             </View>
           </View>
         </TouchableOpacity>
+      </Modal>
+
+      {/* ── Send Money Modal ── */}
+      <Modal
+        visible={sendMoneyModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setSendMoneyModalVisible(false);
+          setWalletAmount('');
+          setWalletNote('');
+        }}
+      >
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => {
+              setSendMoneyModalVisible(false);
+              setWalletAmount('');
+              setWalletNote('');
+            }}
+          >
+            <View 
+              style={[styles.modalContent, styles.editModalContent]} 
+              onStartShouldSetResponder={() => true}
+              {...(Platform.OS === 'web' ? { onClick: (e: any) => e.stopPropagation() } : {})}
+            >
+              <Text style={styles.modalTitle}>Send Money to {username}</Text>
+              
+              <View style={[styles.editInputPill, { minHeight: 48, marginBottom: 12 }]}>
+                <TextInput
+                  style={styles.editTextInput}
+                  value={walletAmount}
+                  onChangeText={setWalletAmount}
+                  keyboardType="numeric"
+                  autoFocus
+                  placeholder="Amount in ₹ (e.g. 50)"
+                  placeholderTextColor="rgba(190,202,185,0.45)"
+                />
+              </View>
+
+              <View style={[styles.editInputPill, { minHeight: 48, marginBottom: 16 }]}>
+                <TextInput
+                  style={styles.editTextInput}
+                  value={walletNote}
+                  onChangeText={setWalletNote}
+                  placeholder="Note (optional)"
+                  placeholderTextColor="rgba(190,202,185,0.45)"
+                />
+              </View>
+
+              <View style={styles.editActionsRow}>
+                <TouchableOpacity
+                  style={[styles.editBtn, styles.editCancelBtn]}
+                  onPress={() => {
+                    setSendMoneyModalVisible(false);
+                    setWalletAmount('');
+                    setWalletNote('');
+                  }}
+                  activeOpacity={0.7}
+                  disabled={isSubmittingWallet}
+                >
+                  <Text style={styles.editCancelBtnText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.editBtn, styles.editSaveBtn, (!walletAmount.trim() || isSubmittingWallet) && styles.editSaveBtnDisabled]}
+                  onPress={handleSendMoneySubmit}
+                  disabled={!walletAmount.trim() || isSubmittingWallet}
+                  activeOpacity={0.7}
+                >
+                  {isSubmittingWallet ? (
+                    <ActivityIndicator size="small" color={isDark ? C.primary : C.white} />
+                  ) : (
+                    <Text style={styles.editSaveBtnText}>Send</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ── Request Money Modal ── */}
+      <Modal
+        visible={requestMoneyModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setRequestMoneyModalVisible(false);
+          setWalletAmount('');
+          setWalletNote('');
+        }}
+      >
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => {
+              setRequestMoneyModalVisible(false);
+              setWalletAmount('');
+              setWalletNote('');
+            }}
+          >
+            <View 
+              style={[styles.modalContent, styles.editModalContent]} 
+              onStartShouldSetResponder={() => true}
+              {...(Platform.OS === 'web' ? { onClick: (e: any) => e.stopPropagation() } : {})}
+            >
+              <Text style={styles.modalTitle}>Request Money from {username}</Text>
+              
+              <View style={[styles.editInputPill, { minHeight: 48, marginBottom: 12 }]}>
+                <TextInput
+                  style={styles.editTextInput}
+                  value={walletAmount}
+                  onChangeText={setWalletAmount}
+                  keyboardType="numeric"
+                  autoFocus
+                  placeholder="Amount in ₹ (e.g. 50)"
+                  placeholderTextColor="rgba(190,202,185,0.45)"
+                />
+              </View>
+
+              <View style={[styles.editInputPill, { minHeight: 48, marginBottom: 16 }]}>
+                <TextInput
+                  style={styles.editTextInput}
+                  value={walletNote}
+                  onChangeText={setWalletNote}
+                  placeholder="Description note (required)"
+                  placeholderTextColor="rgba(190,202,185,0.45)"
+                />
+              </View>
+
+              <View style={styles.editActionsRow}>
+                <TouchableOpacity
+                  style={[styles.editBtn, styles.editCancelBtn]}
+                  onPress={() => {
+                    setRequestMoneyModalVisible(false);
+                    setWalletAmount('');
+                    setWalletNote('');
+                  }}
+                  activeOpacity={0.7}
+                  disabled={isSubmittingWallet}
+                >
+                  <Text style={styles.editCancelBtnText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.editBtn, styles.editSaveBtn, (!walletAmount.trim() || !walletNote.trim() || isSubmittingWallet) && styles.editSaveBtnDisabled]}
+                  onPress={handleRequestMoneySubmit}
+                  disabled={!walletAmount.trim() || !walletNote.trim() || isSubmittingWallet}
+                  activeOpacity={0.7}
+                >
+                  {isSubmittingWallet ? (
+                    <ActivityIndicator size="small" color={isDark ? C.primary : C.white} />
+                  ) : (
+                    <Text style={styles.editSaveBtnText}>Request</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* ── Image Lightbox Modal ── */}
@@ -1480,17 +1975,19 @@ function getStyles(C: ThemeColors, isDark: boolean) {
     shadowColor: C.primary, shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08, shadowRadius: 12, elevation: 6, zIndex: 10,
   },
-  headerIconBtn:           { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  headerProfile:           { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, marginLeft: 4 },
+  headerIconBtn:           { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  headerProfile:           { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 10, marginLeft: 4 },
   headerAvatarWrap:        { position: 'relative', width: 40, height: 40 },
   headerAvatar:            { width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderColor: C.outlineVariant },
   headerAvatarFallback:    { width: 40, height: 40, borderRadius: 20, backgroundColor: C.surfaceContainer, borderWidth: 2, borderColor: C.outlineVariant, alignItems: 'center', justifyContent: 'center' },
   headerAvatarInitial:     { fontSize: 18, fontWeight: '800', color: C.primary },
   headerOnlineDot:         { position: 'absolute', bottom: 0, right: 0, width: 12, height: 12, borderRadius: 6, backgroundColor: C.primary, borderWidth: 2, borderColor: C.background },
+  headerTextBlock:         { flex: 1, minWidth: 0 },
   headerName:              { fontSize: 17, fontWeight: '700', color: C.onSurface, letterSpacing: -0.3 },
   headerStatus:            { fontSize: 12, fontWeight: '500', color: C.onSurfaceVariant, marginTop: 1 },
   headerStatusOnline:      { color: C.primary },
-  headerActions:           { flexDirection: 'row', gap: 2 },
+  headerActions:           { flexDirection: 'row', gap: 2, flexShrink: 0 },
+  headerActionsCompact:    { gap: 0 },
 
   messageList:             { paddingHorizontal: 16, paddingTop: 8 },
 
@@ -1523,11 +2020,14 @@ function getStyles(C: ThemeColors, isDark: boolean) {
   typingDot:               { width: 8, height: 8, borderRadius: 4, backgroundColor: C.primary },
 
   inputBar:                { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 10, paddingTop: 12, backgroundColor: isDark ? 'rgba(15,21,14,0.95)' : 'rgba(244,250,243,0.95)', borderTopWidth: 1, borderTopColor: C.outlineVariant, gap: 6 },
+  inputBarCompact:         { paddingHorizontal: 6, gap: 4 },
   inputIconBtn:            { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
+  inputIconBtnCompact:     { width: 38 },
   inputPill:               { flex: 1, flexDirection: 'row', alignItems: 'flex-end', backgroundColor: C.surfaceContainerHighest, borderRadius: 24, borderWidth: 1.5, borderColor: C.outlineVariant, paddingHorizontal: 14, paddingVertical: 4, minHeight: 50 },
   textInput:               { flex: 1, fontSize: 16, fontWeight: '400', color: C.onSurface, paddingTop: Platform.OS === 'ios' ? 10 : 8, paddingBottom: Platform.OS === 'ios' ? 10 : 8, maxHeight: 110 },
   emojiBtn:                { width: 36, height: 44, alignItems: 'center', justifyContent: 'center', marginLeft: 4 },
   sendBtn:                 { width: 46, height: 46, borderRadius: 23, backgroundColor: C.surfaceContainerHighest, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
+  sendBtnCompact:          { width: 42, height: 42, borderRadius: 21 },
   sendBtnActive:           { backgroundColor: C.primary, shadowColor: C.primary, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.4, shadowRadius: 14, elevation: 8 },
 
   // Skeleton Styling
@@ -1833,12 +2333,13 @@ function getStyles(C: ThemeColors, isDark: boolean) {
   attachmentOptionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 16,
+    columnGap: 12,
+    rowGap: 18,
     justifyContent: 'space-between',
     marginVertical: 12,
   },
   attachmentOptionBtn: {
-    width: '22%',
+    width: '29%',
     alignItems: 'center',
     gap: 8,
   },
@@ -1853,10 +2354,11 @@ function getStyles(C: ThemeColors, isDark: boolean) {
     borderColor: C.cardBorder,
   },
   attachmentOptionLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     color: C.onSurface,
     textAlign: 'center',
+    maxWidth: '100%',
   },
   
   /* ── Voice Recording overlay ────────────────────────── */
@@ -1910,6 +2412,83 @@ function getStyles(C: ThemeColors, isDark: boolean) {
     backgroundColor: C.errorColor,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  
+  /* ── Transaction and Request Cards ─────────────────── */
+  transactionCard: {
+    padding: 12,
+    borderRadius: 16,
+    width: 220,
+    gap: 6,
+  },
+  transactionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  transactionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  transactionAmount: {
+    fontSize: 20,
+    fontWeight: '800',
+    marginTop: 4,
+  },
+  transactionNote: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    marginTop: 4,
+    opacity: 0.8,
+  },
+  transactionRef: {
+    fontSize: 10,
+    opacity: 0.6,
+    marginTop: 2,
+  },
+  
+  // Payment Request Specific Styles
+  requestActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+  },
+  requestButton: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  payButton: {
+    backgroundColor: C.primary,
+  },
+  payButtonText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: isDark ? '#002105' : '#ffffff',
+  },
+  declineButton: {
+    backgroundColor: C.surfaceContainerHighest,
+    borderWidth: 1,
+    borderColor: C.cardBorder,
+  },
+  declineButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: C.onSurfaceVariant,
+  },
+  requestBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginTop: 6,
+    backgroundColor: C.surfaceContainerHighest,
+  },
+  requestBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
 });
 }

@@ -22,10 +22,11 @@ import {
   ScrollView,
   Animated,
   ActivityIndicator,
-  Dimensions,
+  useWindowDimensions,
   Platform,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NICHES } from '@/constants/niches';
 import { useTheme, useStyles } from '@/hooks/useTheme';
 import { ThemeColors } from '@/types/theme';
@@ -34,9 +35,7 @@ import { ThemeColors } from '@/types/theme';
 // Constants
 // ---------------------------------------------------------------------------
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PILL_GAP = 10;
-const PILL_WIDTH = (SCREEN_WIDTH - 40 - PILL_GAP) / 2;
 const MIN_SELECTIONS = 3;
 const MAX_SELECTIONS = 5;
 
@@ -52,9 +51,10 @@ interface PillProps {
   isSelected: boolean;
   isDisabled: boolean;
   onPress: () => void;
+  width: number;
 }
 
-function NichePill({ label, emoji, isSelected, isDisabled, onPress }: PillProps) {
+function NichePill({ label, emoji, isSelected, isDisabled, onPress, width }: PillProps) {
   const { colors: C, isDark } = useTheme();
   const styles = useStyles(getStyles);
   const scale = useRef(new Animated.Value(1)).current;
@@ -65,7 +65,7 @@ function NichePill({ label, emoji, isSelected, isDisabled, onPress }: PillProps)
     Animated.spring(scale, { toValue: 1, useNativeDriver: true, tension: 200, friction: 8 }).start();
 
   return (
-    <Animated.View style={[{ width: PILL_WIDTH, transform: [{ scale }], opacity: isDisabled ? 0.38 : 1 }]}>
+    <Animated.View style={[{ width, transform: [{ scale }], opacity: isDisabled ? 0.38 : 1 }]}>
       <TouchableOpacity
         activeOpacity={1}
         onPress={onPress}
@@ -104,6 +104,9 @@ export default function EditNichesSheet({
 }: EditNichesSheetProps) {
   const { colors: C, isDark } = useTheme();
   const styles = useStyles(getStyles);
+  const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
+  const pillWidth = Math.max(128, (windowWidth - 40 - PILL_GAP) / 2);
   const [selected, setSelected] = useState<Set<string>>(new Set(currentNiches));
 
   // Re-sync when sheet opens with fresh currentNiches
@@ -180,13 +183,14 @@ export default function EditNichesSheet({
                 isSelected={isSelected}
                 isDisabled={isDisabled}
                 onPress={() => toggleNiche(niche.label)}
+                width={pillWidth}
               />
             );
           })}
         </ScrollView>
 
         {/* Footer */}
-        <View style={styles.sheetFooter}>
+        <View style={[styles.sheetFooter, { paddingBottom: Math.max(insets.bottom + 12, Platform.OS === 'android' ? 16 : 20) }]}>
           <Text style={styles.ruleLabel}>
             {MIN_SELECTIONS} MINIMUM · {MAX_SELECTIONS} MAXIMUM
           </Text>

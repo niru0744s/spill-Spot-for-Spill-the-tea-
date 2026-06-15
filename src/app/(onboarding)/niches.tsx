@@ -30,9 +30,9 @@ import {
   ScrollView,
   Animated,
   ActivityIndicator,
-  Dimensions,
   StatusBar,
   Platform,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -52,9 +52,7 @@ import { NICHES, type NicheItem } from '@/constants/niches';
 // Constants
 // ---------------------------------------------------------------------------
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PILL_GAP = 10;
-const PILL_WIDTH = (SCREEN_WIDTH - 40 - PILL_GAP) / 2; // 2 columns, 20px side margins
 
 const MIN_SELECTIONS = 3;
 const MAX_SELECTIONS = 5;
@@ -71,6 +69,7 @@ interface NichePillProps {
   isDisabled: boolean; // true when max reached and this pill is unselected
   onPress: () => void;
   fontsLoaded: boolean;
+  width: number;
 }
 
 function NichePill({
@@ -80,6 +79,7 @@ function NichePill({
   isDisabled,
   onPress,
   fontsLoaded,
+  width,
 }: NichePillProps) {
   const scale = useRef(new Animated.Value(1)).current;
   const glowOpacity = useRef(new Animated.Value(isSelected ? 1 : 0)).current;
@@ -116,7 +116,7 @@ function NichePill({
     <Animated.View
       style={[
         styles.pillWrapper,
-        { transform: [{ scale }], opacity: isDisabled ? 0.38 : 1 },
+        { width, transform: [{ scale }], opacity: isDisabled ? 0.38 : 1 },
       ]}
     >
       <TouchableOpacity
@@ -155,6 +155,8 @@ function NichePill({
 
 export default function NicheSelectionScreen() {
   const { saveNiches, isLoading } = useAuth();
+  const { width: windowWidth } = useWindowDimensions();
+  const pillWidth = Math.max(128, (windowWidth - 40 - PILL_GAP) / 2);
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
@@ -307,6 +309,7 @@ export default function NicheSelectionScreen() {
               isDisabled={isDisabled}
               onPress={() => toggleNiche(niche.label)}
               fontsLoaded={fontsLoaded ?? false}
+              width={pillWidth}
             />
           );
         })}
@@ -463,7 +466,6 @@ const styles = StyleSheet.create({
 
   // ── Niche pill ─────────────────────────────────────────────────────────
   pillWrapper: {
-    width: PILL_WIDTH,
   },
   pill: {
     flexDirection: 'row',

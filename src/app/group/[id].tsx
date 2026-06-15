@@ -251,7 +251,7 @@ export default function GroupChatRoomScreen() {
   return (
     <KeyboardAvoidingView
       style={[styles.container, { paddingTop: insets.top }]}
-      behavior="padding"
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
     >
       {/* Header */}
@@ -281,7 +281,7 @@ export default function GroupChatRoomScreen() {
               </View>
             )}
           </View>
-          <View>
+          <View style={styles.headerTextBlock}>
             <Text style={styles.groupName} numberOfLines={1}>
               {groupDetails?.groupName ?? 'Loading...'}
             </Text>
@@ -388,11 +388,16 @@ function getStyles(C: ThemeColors, isDark: boolean) {
   },
   headerTitleContainer: {
     flex: 1,
+    minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
     marginLeft: 12,
     gap: 10,
     paddingRight: 10,
+  },
+  headerTextBlock: {
+    flex: 1,
+    minWidth: 0,
   },
   avatar: {
     width: 40,

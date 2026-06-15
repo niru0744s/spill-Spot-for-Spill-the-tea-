@@ -23,7 +23,6 @@ import {
   Animated,
   Easing,
   ScrollView,
-  Dimensions,
   Image,
   Platform,
 } from 'react-native';
@@ -36,8 +35,6 @@ import { isUserOnline } from '@/services/presenceService';
 import { triggerSelection, triggerMediumImpact } from '@/services/hapticService';
 import { useTheme, useStyles } from '@/hooks/useTheme';
 import { ThemeColors } from '@/types/theme';
-
-const { width } = Dimensions.get('window');
 
 /* ── Orbital background orb ────────────────────────────────── */
 function OrbBackground() {
@@ -148,6 +145,26 @@ function MyTeaBubble({ displayName, photoURL }: { displayName: string; photoURL:
   );
 }
 
+/* ── Last Message Formatter Helper ────────────────────────── */
+function formatLastMessage(text: string): string {
+  if (!text) return 'Say hello! 👋';
+  if (text.startsWith('{') && text.endsWith('}')) {
+    try {
+      const data = JSON.parse(text);
+      if (data.type === 'SEND_FUNDS' || data.type === 'RECEIVE_FUNDS' || data.amount !== undefined) {
+        const amount = (data.amount ?? 0) / 100;
+        if (data.requestId) {
+          return `💳 Payment Request: ₹${amount.toFixed(2)}`;
+        }
+        return `💸 Paid ₹${amount.toFixed(2)}`;
+      }
+    } catch (e) {
+      // Not JSON or parsing failed, fallback to raw text
+    }
+  }
+  return text;
+}
+
 /* ── Chat card ─────────────────────────────────────────────── */
 const ChatCard = React.memo(function ChatCard({ item, onPress, index }: { item: InboxItem; onPress: () => void; index: number }) {
   const { colors: C } = useTheme();
@@ -205,7 +222,7 @@ const ChatCard = React.memo(function ChatCard({ item, onPress, index }: { item: 
 
           <View style={styles.chatRow}>
             <Text style={[styles.chatPreview, hasUnread && styles.chatPreviewActive]} numberOfLines={1}>
-              {item.lastMessage || 'Say hello! 👋'}
+              {formatLastMessage(item.lastMessage)}
             </Text>
 
             {hasUnread && (
@@ -337,7 +354,7 @@ export default function ChatsScreen() {
           data={chats.filter((c) => !c.isGroup)}
           keyExtractor={(item) => item.chatId}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom + 100, 112) }]}
           initialNumToRender={10}
           maxToRenderPerBatch={8}
           windowSize={11}
@@ -374,7 +391,7 @@ export default function ChatsScreen() {
 
         {/* ── Floating Action Button ───────────────────────── */}
         <TouchableOpacity
-          style={styles.fab}
+          style={[styles.fab, { bottom: Math.max(insets.bottom + 20, 24) }]}
           onPress={handleNewChat}
           activeOpacity={0.85}
         >
@@ -472,7 +489,6 @@ const getStyles = (C: ThemeColors, isDark: boolean) => StyleSheet.create({
 
   /* ── Scroll content ──────────────────────────────────────── */
   scrollContent: {
-    paddingBottom: 100,
     flexGrow: 1,
   },
 
