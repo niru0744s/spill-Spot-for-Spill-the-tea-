@@ -41,6 +41,7 @@
     "react-native-agora": "^4.5.4",
     "react-native-gesture-handler": "~2.31.1",
     "react-native-mmkv": "^4.3.1",
+    "react-native-razorpay": "^3.0.0",
     "react-native-reanimated": "4.3.1",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "4.25.2",
@@ -50,16 +51,17 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
+    "cross-env": "^10.1.0",
     "eslint": "^9.0.0",
     "eslint-config-expo": "~56.0.4",
     "typescript": "~6.0.3"
   },
   "scripts": {
-    "start": "expo start",
+    "start": "cross-env NODE_OPTIONS=\"--max-old-space-size=4096\" expo start",
     "reset-project": "node ./scripts/reset-project.js",
-    "android": "expo run:android",
-    "ios": "expo run:ios",
-    "web": "expo start --web",
+    "android": "cross-env NODE_OPTIONS=\"--max-old-space-size=4096\" expo run:android",
+    "ios": "cross-env NODE_OPTIONS=\"--max-old-space-size=4096\" expo run:ios",
+    "web": "cross-env NODE_OPTIONS=\"--max-old-space-size=4096\" expo start --web",
     "lint": "expo lint"
   },
   "private": true

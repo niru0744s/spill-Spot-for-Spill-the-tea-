@@ -96,3 +96,7 @@ firebase-debug.log
 # Claude config directory
 .claude/
 
+# Firebase Service Account (secrets)
+serviceAccountKey.json
+backend/serviceAccountKey.json
+
