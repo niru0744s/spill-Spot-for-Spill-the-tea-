@@ -28,7 +28,7 @@ export interface StoredMessage {
   senderName?: string;
   senderPhoto?: string | null;
   content: string;
-  type: 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE' | 'DELETED';
+  type: 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE' | 'DELETED' | 'TRANSACTION' | 'PAYMENT_REQUEST';
   status: MessageStatus;
   createdAt: number;    // Unix ms
   isMine: boolean;      // shortcut: senderUid === currentUser.uid
@@ -143,6 +143,31 @@ export function getMessagePreview(msg: StoredMessage): string {
   if (msg.type === 'AUDIO') return '🎙️ Voice Message';
   if (msg.type === 'FILE') return `📄 ${msg.fileName || 'File'}`;
   if (msg.type === 'DELETED') return '🚫 Message deleted';
+
+  if (msg.type === 'TRANSACTION') {
+    try {
+      const data = JSON.parse(msg.content);
+      const amount = (data.amount ?? 0) / 100;
+      const { auth } = require('@/config/firebase');
+      const isMine = msg.senderUid === auth.currentUser?.uid;
+      return isMine ? `💸 Sent ₹${amount.toFixed(2)}` : `💰 Received ₹${amount.toFixed(2)}`;
+    } catch {
+      return '💸 Transaction';
+    }
+  }
+
+  if (msg.type === 'PAYMENT_REQUEST') {
+    try {
+      const data = JSON.parse(msg.content);
+      const amount = (data.amount ?? 0) / 100;
+      const { auth } = require('@/config/firebase');
+      const isMine = msg.senderUid === auth.currentUser?.uid;
+      return isMine ? `📤 Requested ₹${amount.toFixed(2)}` : `📥 Request for ₹${amount.toFixed(2)}`;
+    } catch {
+      return '💳 Payment Request';
+    }
+  }
+
   return msg.content;
 }
 
