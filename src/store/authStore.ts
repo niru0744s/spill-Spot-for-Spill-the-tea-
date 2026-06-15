@@ -35,6 +35,7 @@ export interface UserProfile {
    * If undefined or empty, the user hasn't completed niche onboarding yet.
    */
   niches?: string[];
+  bio?: string;
 }
 
 interface AuthState {

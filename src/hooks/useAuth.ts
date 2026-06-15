@@ -286,7 +286,7 @@ export function useAuth() {
   // -------------------------------------------------------------------------
   const updateProfile = useCallback(
     async (
-      data: Partial<Pick<UserProfile, "displayName" | "photoURL">>
+      data: Partial<Pick<UserProfile, "displayName" | "photoURL" | "name" | "bio">>
     ): Promise<void> => {
       if (!firebaseUser) {
         setError("You must be signed in to update your profile.");
